@@ -56,7 +56,7 @@ contract Bootstrap is Script {
     }
     
     function loadDeployedContracts() internal {
-        string memory deploymentData = vm.readFile("../deployment.json");
+        string memory deploymentData = vm.readFile("./deployments/testnet.json");
         
         tokenA = IERC20(vm.parseJsonAddress(deploymentData, ".tokenA"));
         tokenB = IERC20(vm.parseJsonAddress(deploymentData, ".tokenB"));
