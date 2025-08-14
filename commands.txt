@@ -1,0 +1,15 @@
+gblend verify-contract $BASIC_AMM BasicAMM \
+    --verifier blockscout \
+    --verifier-url https://testnet.fluentscan.xyz/api/ \
+    --constructor-args $(cast abi-encode "constructor(address,address,string,string)" $TOKEN_A $TOKEN_B "Basic AMM LP Token" "BAMM-LP")
+
+gblend verify-contract $ENHANCED_AMM src/EnhancedAMM.sol:EnhancedAMM \
+    --verifier blockscout \
+    --verifier-url https://testnet.fluentscan.xyz/api/ \
+    --constructor-args $(cast abi-encode "constructor(address,address,address,string,string)" $TOKEN_A $TOKEN_B $MATH_ENGINE "EnhancedAMM-LPToken" "EAMM-LP")
+
+gblend script script/Bootstrap.s.sol:Bootstrap \
+    --rpc-url fluent-testnet \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    -vvv
