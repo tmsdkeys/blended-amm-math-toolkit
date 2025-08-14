@@ -11,5 +11,5 @@ gblend verify-contract $ENHANCED_AMM src/EnhancedAMM.sol:EnhancedAMM \
 gblend script script/Bootstrap.s.sol:Bootstrap \
     --rpc-url fluent-testnet \
     --private-key $PRIVATE_KEY \
-    --broadcast
+    --broadcast \
     -vvv
