@@ -41,7 +41,7 @@ contract DeployedGasBenchmark is Test {
         console.log("=== Loading Deployed Contracts ===");
         
         // Load deployment addresses from JSON
-        string memory deploymentData = vm.readFile("./deployment.json");
+        string memory deploymentData = vm.readFile("../deployment.json");
         
         tokenA = IERC20(vm.parseJsonAddress(deploymentData, ".tokenA"));
         tokenB = IERC20(vm.parseJsonAddress(deploymentData, ".tokenB"));
