@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/Script.sol";
-import "../src/BasicAMM.sol";
-import "../src/EnhancedAMM.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Script, console} from "forge-std/Script.sol";
+import {BasicAMM} from "../src/BasicAMM.sol";
+import {EnhancedAMM} from "../src/EnhancedAMM.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title Bootstrap
@@ -14,8 +14,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract Bootstrap is Script {
     
     // Deployed contracts
-    BasicAMM public basicAMM;
-    EnhancedAMM public enhancedAMM;
+    BasicAMM public basicAmm;
+    EnhancedAMM public enhancedAmm;
     IERC20 public tokenA;
     IERC20 public tokenB;
     
@@ -60,14 +60,14 @@ contract Bootstrap is Script {
         
         tokenA = IERC20(vm.parseJsonAddress(deploymentData, ".tokenA"));
         tokenB = IERC20(vm.parseJsonAddress(deploymentData, ".tokenB"));
-        basicAMM = BasicAMM(vm.parseJsonAddress(deploymentData, ".basicAMM"));
-        enhancedAMM = EnhancedAMM(vm.parseJsonAddress(deploymentData, ".enhancedAMM"));
+        basicAmm = BasicAMM(vm.parseJsonAddress(deploymentData, ".basicAMM"));
+        enhancedAmm = EnhancedAMM(vm.parseJsonAddress(deploymentData, ".enhancedAMM"));
         
         console.log("Loaded contracts:");
         console.log("  Token A:", address(tokenA));
         console.log("  Token B:", address(tokenB));
-        console.log("  Basic AMM:", address(basicAMM));
-        console.log("  Enhanced AMM:", address(enhancedAMM));
+        console.log("  Basic AMM:", address(basicAmm));
+        console.log("  Enhanced AMM:", address(enhancedAmm));
     }
     
     function setupTestAccounts() internal {
@@ -96,14 +96,14 @@ contract Bootstrap is Script {
         require(balanceB >= INITIAL_LIQUIDITY * 2, "Insufficient Token B for bootstrap");
         
         // Approve AMMs
-        tokenA.approve(address(basicAMM), INITIAL_LIQUIDITY);
-        tokenB.approve(address(basicAMM), INITIAL_LIQUIDITY);
-        tokenA.approve(address(enhancedAMM), INITIAL_LIQUIDITY);
-        tokenB.approve(address(enhancedAMM), INITIAL_LIQUIDITY);
+        tokenA.approve(address(basicAmm), INITIAL_LIQUIDITY);
+        tokenB.approve(address(basicAmm), INITIAL_LIQUIDITY);
+        tokenA.approve(address(enhancedAmm), INITIAL_LIQUIDITY);
+        tokenB.approve(address(enhancedAmm), INITIAL_LIQUIDITY);
         
         // Add liquidity to Basic AMM
         console.log("Adding liquidity to Basic AMM...");
-        uint256 basicLiquidity = basicAMM.addLiquidity(
+        uint256 basicLiquidity = basicAmm.addLiquidity(
             INITIAL_LIQUIDITY,
             INITIAL_LIQUIDITY,
             0,
@@ -114,7 +114,7 @@ contract Bootstrap is Script {
         
         // Add liquidity to Enhanced AMM
         console.log("Adding liquidity to Enhanced AMM...");
-        uint256 enhancedLiquidity = enhancedAMM.addLiquidityEnhanced(
+        uint256 enhancedLiquidity = enhancedAmm.addLiquidityEnhanced(
             INITIAL_LIQUIDITY,
             INITIAL_LIQUIDITY,
             0,
@@ -129,30 +129,30 @@ contract Bootstrap is Script {
         
         // Fund Alice (liquidity provider)
         console.log("Funding Alice...");
-        tokenA.transfer(alice, TEST_TOKENS_PER_USER);
-        tokenB.transfer(alice, TEST_TOKENS_PER_USER);
+        require(tokenA.transfer(alice, TEST_TOKENS_PER_USER), "Token A transfer to Alice failed");
+        require(tokenB.transfer(alice, TEST_TOKENS_PER_USER), "Token B transfer to Alice failed");
         
         // Fund Bob (swapper)
         console.log("Funding Bob...");
-        tokenA.transfer(bob, TEST_TOKENS_PER_USER);
-        tokenB.transfer(bob, TEST_TOKENS_PER_USER);
+        require(tokenA.transfer(bob, TEST_TOKENS_PER_USER), "Token A transfer to Bob failed");
+        require(tokenB.transfer(bob, TEST_TOKENS_PER_USER), "Token B transfer to Bob failed");
         
         // Fund Charlie (additional tester)
         console.log("Funding Charlie...");
-        tokenA.transfer(charlie, TEST_TOKENS_PER_USER / 2);
-        tokenB.transfer(charlie, TEST_TOKENS_PER_USER / 2);
+        require(tokenA.transfer(charlie, TEST_TOKENS_PER_USER / 2), "Token A transfer to Charlie failed");
+        require(tokenB.transfer(charlie, TEST_TOKENS_PER_USER / 2), "Token B transfer to Charlie failed");
     }
     
-    function verifySetup() internal {
+    function verifySetup() internal view {
         console.log("\n=== Verifying Setup ===");
         
         // Check AMM reserves
-        (uint256 basicReserve0, uint256 basicReserve1) = basicAMM.getReserves();
+        (uint256 basicReserve0, uint256 basicReserve1) = basicAmm.getReserves();
         console.log("Basic AMM Reserves:");
         console.log("  Token A:", basicReserve0 / 1e18);
         console.log("  Token B:", basicReserve1 / 1e18);
         
-        (uint256 enhancedReserve0, uint256 enhancedReserve1) = enhancedAMM.getReserves();
+        (uint256 enhancedReserve0, uint256 enhancedReserve1) = enhancedAmm.getReserves();
         console.log("Enhanced AMM Reserves:");
         console.log("  Token A:", enhancedReserve0 / 1e18);
         console.log("  Token B:", enhancedReserve1 / 1e18);
