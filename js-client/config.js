@@ -25,8 +25,7 @@ const CONFIG = {
   TEST_TOKENS_PER_USER: ethers.utils.parseEther("5000"), // 5k tokens per user
 
   // Your private key (set this as environment variable)
-  privateKey:
-    "8b3d42dc1cd75b54625fd098da2ad5c475bb68fabc25c256565a2581568fb0ef",
+  privateKey: "",
 };
 
 // Helper function to load ABI from build artifacts
