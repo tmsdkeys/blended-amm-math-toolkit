@@ -15,7 +15,7 @@ contract Bootstrap is Script {
     
     // Deployed contracts
     BasicAMM public basicAmm;
-    BlendedAMM public enhancedAmm;
+    BlendedAMM public blendedAmm;
     IERC20 public tokenA;
     IERC20 public tokenB;
     

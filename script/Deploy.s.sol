@@ -12,7 +12,7 @@ contract Deploy is Script {
     address public tokenB;
     address public mathEngine;
     address public basicAmm;
-    address public enhancedAmm;
+    address public blendedAmm;
     
     function run() external {
         // Start broadcasting transactions
@@ -34,7 +34,7 @@ contract Deploy is Script {
         ));
         console.log("Basic AMM deployed at:", basicAmm);
         
-        // Step 4: Deploy Enhanced AMM (with Rust math engine)
+        // Step 4: Deploy Blended AMM (with Rust math engine)
         blendedAmm = address(new BlendedAMM(
             tokenA,
             tokenB,

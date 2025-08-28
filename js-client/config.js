@@ -85,9 +85,9 @@ async function getGasUsed(tx) {
   return receipt.gasUsed;
 }
 
-function calculateGasSavings(basicGas, enhancedGas) {
+function calculateGasSavings(basicGas, blendedGas) {
   if (basicGas.eq(0)) return "N/A";
-  const diff = basicGas.sub(enhancedGas);
+  const diff = basicGas.sub(blendedGas);
   const percentSaved = diff.mul(100).div(basicGas);
   return {
     saved: diff,

@@ -5,7 +5,7 @@ const {
   wallet,
   ERC20_ABI,
   BASIC_AMM_ABI,
-  ENHANCED_AMM_ABI,
+  BLENDED_AMM_ABI,
   formatEther,
   parseEther,
   getGasUsed,
@@ -17,16 +17,16 @@ class GasBenchmark {
     this.results = [];
   }
 
-  async recordTest(name, basicTx, enhancedTx, description = "") {
+  async recordTest(name, basicTx, blendedTx, description = "") {
     const basicGas = await getGasUsed(basicTx);
-    const enhancedGas = await getGasUsed(enhancedTx);
-    const savings = calculateGasSavings(basicGas, enhancedGas);
+    const blendedGas = await getGasUsed(blendedTx);
+    const savings = calculateGasSavings(basicGas, blendedGas);
 
     const result = {
       name,
       description,
       basicGas: basicGas.toString(),
-      enhancedGas: enhancedGas.toString(),
+      blendedGas: blendedGas.toString(),
       savings: savings.saved ? savings.saved.toString() : "0",
       percentSaved: savings.percentSaved || 0,
     };
@@ -36,7 +36,7 @@ class GasBenchmark {
     console.log(`\n=== ${name} ===`);
     if (description) console.log(description);
     console.log(`Basic AMM Gas:    ${basicGas.toString()}`);
-    console.log(`Enhanced AMM Gas: ${enhancedGas.toString()}`);
+    console.log(`Blended AMM Gas: ${blendedGas.toString()}`);
 
     if (savings.percentSaved > 0) {
       console.log(
@@ -61,34 +61,34 @@ class GasBenchmark {
     console.log("=".repeat(80));
 
     let totalBasicGas = ethers.BigNumber.from(0);
-    let totalEnhancedGas = ethers.BigNumber.from(0);
+    let totalBlendedGas = ethers.BigNumber.from(0);
 
     this.results.forEach((result) => {
       totalBasicGas = totalBasicGas.add(result.basicGas);
-      totalEnhancedGas = totalEnhancedGas.add(result.enhancedGas);
+      totalBlendedGas = totalBlendedGas.add(result.blendedGas);
 
       const name = result.name.padEnd(25);
       const basicGas = result.basicGas.padStart(10);
-      const enhancedGas = result.enhancedGas.padStart(10);
+      const blendedGas = result.blendedGas.padStart(10);
       const savings =
         result.percentSaved >= 0
           ? `+${result.percentSaved}%`.padStart(8)
           : `${result.percentSaved}%`.padStart(8);
 
-      console.log(`${name} | ${basicGas} | ${enhancedGas} | ${savings}`);
+      console.log(`${name} | ${basicGas} | ${blendedGas} | ${savings}`);
     });
 
     console.log("-".repeat(80));
-    const overallSavings = calculateGasSavings(totalBasicGas, totalEnhancedGas);
+    const overallSavings = calculateGasSavings(totalBasicGas, totalBlendedGas);
     const totalBasic = totalBasicGas.toString().padStart(10);
-    const totalEnhanced = totalEnhancedGas.toString().padStart(10);
+    const totalBlended = totalBlendedGas.toString().padStart(10);
     const totalSaved =
       overallSavings.percentSaved >= 0
         ? `+${overallSavings.percentSaved}%`.padStart(8)
         : `${overallSavings.percentSaved}%`.padStart(8);
 
     console.log(
-      `${"TOTAL".padEnd(25)} | ${totalBasic} | ${totalEnhanced} | ${totalSaved}`
+      `${"TOTAL".padEnd(25)} | ${totalBasic} | ${totalBlended} | ${totalSaved}`
     );
     console.log("=".repeat(80));
 
@@ -97,7 +97,7 @@ class GasBenchmark {
       console.log(`💰 Total gas saved: ${overallSavings.saved.toString()}`);
     } else {
       console.log(
-        `📊 Enhanced AMM uses ${Math.abs(
+        `📊 Blended AMM uses ${Math.abs(
           overallSavings.percentSaved
         )}% more gas overall`
       );
@@ -126,9 +126,9 @@ async function runGasComparison() {
       BASIC_AMM_ABI,
       wallet
     );
-    const enhancedAMM = new ethers.Contract(
-      CONFIG.addresses.enhancedAMM,
-      ENHANCED_AMM_ABI,
+    const blendedAMM = new ethers.Contract(
+      CONFIG.addresses.blendedAMM,
+      BLENDED_AMM_ABI,
       wallet
     );
 
@@ -165,13 +165,13 @@ async function runGasComparison() {
     ).wait();
     await (
       await tokenA.approve(
-        CONFIG.addresses.enhancedAMM,
+        CONFIG.addresses.blendedAMM,
         ethers.constants.MaxUint256
       )
     ).wait();
     await (
       await tokenB.approve(
-        CONFIG.addresses.enhancedAMM,
+        CONFIG.addresses.blendedAMM,
         ethers.constants.MaxUint256
       )
     ).wait();
@@ -188,7 +188,7 @@ async function runGasComparison() {
       deployerAddress
     );
 
-    const enhancedSwapTx = await enhancedAMM.swap(
+    const blendedSwapTx = await blendedAMM.swap(
       CONFIG.addresses.tokenA,
       CONFIG.SWAP_AMOUNT,
       0,
@@ -198,12 +198,12 @@ async function runGasComparison() {
     await benchmark.recordTest(
       "Basic Swap",
       basicSwapTx,
-      enhancedSwapTx,
+      blendedSwapTx,
       "Standard swap function comparison (both using Solidity logic)"
     );
 
-    // Test 2: Enhanced Swap vs Basic Swap
-    console.log("🚀 Testing enhanced swap...");
+    // Test 2: Blended Swap vs Basic Swap
+    console.log("🚀 Testing blended swap...");
 
     const basicSwap2Tx = await basicAMM.swap(
       CONFIG.addresses.tokenB,
@@ -212,7 +212,7 @@ async function runGasComparison() {
       deployerAddress
     );
 
-    const enhancedSwap2Tx = await enhancedAMM.swapEnhanced(
+    const blendedSwap2Tx = await blendedAMM.swapEnhanced(
       CONFIG.addresses.tokenB,
       CONFIG.SWAP_AMOUNT,
       0,
@@ -220,10 +220,10 @@ async function runGasComparison() {
     );
 
     await benchmark.recordTest(
-      "Enhanced Swap",
+      "Blended Swap",
       basicSwap2Tx,
-      enhancedSwap2Tx,
-      "Enhanced swap with Rust mathematical engine vs basic Solidity"
+      blendedSwap2Tx,
+      "Blended swap with Rust mathematical engine vs basic Solidity"
     );
 
     // Test 3: Liquidity Addition Comparison
@@ -239,7 +239,7 @@ async function runGasComparison() {
       deployerAddress
     );
 
-    const enhancedLiquidityTx = await enhancedAMM.addLiquidityEnhanced(
+    const blendedLiquidityTx = await blendedAMM.addLiquidityEnhanced(
       liquidityAmount,
       liquidityAmount,
       0,
@@ -250,7 +250,7 @@ async function runGasComparison() {
     await benchmark.recordTest(
       "Add Liquidity",
       basicLiquidityTx,
-      enhancedLiquidityTx,
+      blendedLiquidityTx,
       "Liquidity addition: Babylonian method vs Newton-Raphson square root"
     );
 
@@ -265,7 +265,7 @@ async function runGasComparison() {
       deployerAddress
     );
 
-    const enhancedBasicLiquidityTx = await enhancedAMM.addLiquidity(
+    const blendedBasicLiquidityTx = await blendedAMM.addLiquidity(
       liquidityAmount,
       liquidityAmount,
       0,
@@ -276,7 +276,7 @@ async function runGasComparison() {
     await benchmark.recordTest(
       "Basic Liquidity Methods",
       basicLiquidity2Tx,
-      enhancedBasicLiquidityTx,
+      blendedBasicLiquidityTx,
       "Both using Babylonian method (should be similar)"
     );
 
@@ -286,24 +286,23 @@ async function runGasComparison() {
     // Test theoretical calculations
     console.log("\n=== Theoretical Gas Analysis ===");
     console.log("Key differences observed:");
-    console.log("• Enhanced swaps use Rust for complex math operations");
+    console.log("• Blended swaps use Rust for complex math operations");
     console.log("• Newton-Raphson sqrt in Rust vs Babylonian in Solidity");
-    console.log("• Additional precision and features in Enhanced AMM");
+    console.log("• Additional precision and features in Blended AMM");
     console.log("• Cross-contract calls add some overhead");
 
     // Show current reserves
     console.log("\n=== Final Pool States ===");
     const [basicReserve0, basicReserve1] = await basicAMM.getReserves();
-    const [enhancedReserve0, enhancedReserve1] =
-      await enhancedAMM.getReserves();
+    const [blendedReserve0, blendedReserve1] = await blendedAMM.getReserves();
 
     console.log("Basic AMM Reserves:");
     console.log(`  Token A: ${formatEther(basicReserve0)}`);
     console.log(`  Token B: ${formatEther(basicReserve1)}`);
 
-    console.log("Enhanced AMM Reserves:");
-    console.log(`  Token A: ${formatEther(enhancedReserve0)}`);
-    console.log(`  Token B: ${formatEther(enhancedReserve1)}`);
+    console.log("Blended AMM Reserves:");
+    console.log(`  Token A: ${formatEther(blendedReserve0)}`);
+    console.log(`  Token B: ${formatEther(blendedReserve1)}`);
   } catch (error) {
     console.error("❌ Gas comparison failed:", error.message);
     if (error.transaction) {

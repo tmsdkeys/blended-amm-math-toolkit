@@ -4,14 +4,14 @@ const {
   provider,
   wallet,
   ERC20_ABI,
-  ENHANCED_AMM_ABI,
+  BLENDED_AMM_ABI,
   formatEther,
   parseEther,
   getGasUsed,
 } = require("./config");
 
-async function testEnhancedAMM() {
-  console.log("=== Enhanced AMM Functionality Testing ===\n");
+async function testBlendedAMM() {
+  console.log("=== Blended AMM Functionality Testing ===\n");
 
   try {
     // Initialize contracts
@@ -25,9 +25,9 @@ async function testEnhancedAMM() {
       ERC20_ABI,
       wallet
     );
-    const enhancedAMM = new ethers.Contract(
-      CONFIG.addresses.enhancedAMM,
-      ENHANCED_AMM_ABI,
+    const blendedAMM = new ethers.Contract(
+      CONFIG.addresses.blendedAMM,
+      BLENDED_AMM_ABI,
       wallet
     );
 
@@ -36,9 +36,9 @@ async function testEnhancedAMM() {
 
     // Check initial state
     console.log("=== Initial State ===");
-    const [reserve0, reserve1] = await enhancedAMM.getReserves();
-    const totalSupply = await enhancedAMM.totalSupply();
-    const lpBalance = await enhancedAMM.balanceOf(deployerAddress);
+    const [reserve0, reserve1] = await blendedAMM.getReserves();
+    const totalSupply = await blendedAMM.totalSupply();
+    const lpBalance = await blendedAMM.balanceOf(deployerAddress);
 
     console.log(
       `Reserves: ${formatEther(reserve0)} / ${formatEther(reserve1)}`
@@ -56,20 +56,20 @@ async function testEnhancedAMM() {
     console.log("Ensuring token approvals...");
     await (
       await tokenA.approve(
-        CONFIG.addresses.enhancedAMM,
+        CONFIG.addresses.blendedAMM,
         ethers.constants.MaxUint256
       )
     ).wait();
     await (
       await tokenB.approve(
-        CONFIG.addresses.enhancedAMM,
+        CONFIG.addresses.blendedAMM,
         ethers.constants.MaxUint256
       )
     ).wait();
     console.log("✅ Approvals confirmed\n");
 
-    // Test 1: Enhanced Liquidity Addition
-    console.log("=== Test 1: Enhanced Liquidity Addition ===");
+    // Test 1: Blended Liquidity Addition
+    console.log("=== Test 1: Blended Liquidity Addition ===");
     const liquidityAmount = parseEther("100");
 
     console.log(
@@ -78,7 +78,7 @@ async function testEnhancedAMM() {
       )} of each token using Rust engine...`
     );
 
-    const addLiquidityTx = await enhancedAMM.addLiquidityEnhanced(
+    const addLiquidityTx = await blendedAMM.addLiquidityEnhanced(
       liquidityAmount,
       liquidityAmount,
       0, // amount0Min
@@ -94,55 +94,55 @@ async function testEnhancedAMM() {
     console.log("🚀 Used Newton-Raphson square root in Rust");
 
     // Check new LP balance
-    const newLpBalance = await enhancedAMM.balanceOf(deployerAddress);
+    const newLpBalance = await blendedAMM.balanceOf(deployerAddress);
     const lpReceived = newLpBalance.sub(lpBalance);
     console.log(`LP Tokens Received: ${formatEther(lpReceived)}`);
 
     // Check new reserves
-    const [newReserve0, newReserve1] = await enhancedAMM.getReserves();
+    const [newReserve0, newReserve1] = await blendedAMM.getReserves();
     console.log(
       `New Reserves: ${formatEther(newReserve0)} / ${formatEther(
         newReserve1
       )}\n`
     );
 
-    // Test 2: Enhanced Swap with Rust Engine
-    console.log("=== Test 2: Enhanced Swap (Rust-Powered) ===");
+    // Test 2: Blended Swap with Rust Engine
+    console.log("=== Test 2: Blended Swap (Rust-Powered) ===");
     const swapAmount = parseEther("50");
 
     console.log(
-      `Swapping ${formatEther(swapAmount)} Token A using enhanced engine...`
+      `Swapping ${formatEther(swapAmount)} Token A using blended engine...`
     );
 
-    const enhancedSwapTx = await enhancedAMM.swapEnhanced(
+    const blendedSwapTx = await blendedAMM.swapEnhanced(
       CONFIG.addresses.tokenA,
       swapAmount,
       0, // amountOutMin
       deployerAddress
     );
 
-    const enhancedSwapReceipt = await enhancedSwapTx.wait();
-    const enhancedSwapGas = enhancedSwapReceipt.gasUsed;
+    const blendedSwapReceipt = await blendedSwapTx.wait();
+    const blendedSwapGas = blendedSwapReceipt.gasUsed;
 
-    console.log(`Transaction Hash: ${enhancedSwapReceipt.transactionHash}`);
-    console.log(`Gas Used: ${enhancedSwapGas.toString()}`);
+    console.log(`Transaction Hash: ${blendedSwapReceipt.transactionHash}`);
+    console.log(`Gas Used: ${blendedSwapGas.toString()}`);
     console.log("🚀 Used Rust mathematical engine for precision");
 
-    // Check reserves after enhanced swap
-    const [postEnhancedReserve0, postEnhancedReserve1] =
-      await enhancedAMM.getReserves();
+    // Check reserves after blended swap
+    const [postBlendedReserve0, postBlendedReserve1] =
+      await blendedAMM.getReserves();
     console.log(
-      `Reserves After Enhanced Swap: ${formatEther(
-        postEnhancedReserve0
-      )} / ${formatEther(postEnhancedReserve1)}`
+      `Reserves After Blended Swap: ${formatEther(
+        postBlendedReserve0
+      )} / ${formatEther(postBlendedReserve1)}`
     );
 
-    const enhancedReceived = newReserve1.sub(postEnhancedReserve1);
-    console.log(`Token B Received: ${formatEther(enhancedReceived)}`);
+    const blendedReceived = newReserve1.sub(postBlendedReserve1);
+    console.log(`Token B Received: ${formatEther(blendedReceived)}`);
 
-    const enhancedRate = enhancedReceived.mul(parseEther("1")).div(swapAmount);
+    const blendedRate = blendedReceived.mul(parseEther("1")).div(swapAmount);
     console.log(
-      `Enhanced Rate: 1 Token A = ${formatEther(enhancedRate)} Token B\n`
+      `Blended Rate: 1 Token A = ${formatEther(blendedRate)} Token B\n`
     );
 
     // Test 3: Compare with Basic Swap
@@ -152,7 +152,7 @@ async function testEnhancedAMM() {
       `Swapping ${formatEther(swapAmount)} Token A using basic Solidity...`
     );
 
-    const basicSwapTx = await enhancedAMM.swap(
+    const basicSwapTx = await blendedAMM.swap(
       CONFIG.addresses.tokenA,
       swapAmount,
       0, // amountOutMin
@@ -167,16 +167,16 @@ async function testEnhancedAMM() {
     console.log("⚖️  Used standard Solidity arithmetic");
 
     // Calculate gas difference
-    const gasDifference = basicSwapGas.sub(enhancedSwapGas);
+    const gasDifference = basicSwapGas.sub(blendedSwapGas);
     const percentDifference = gasDifference.mul(100).div(basicSwapGas);
 
     if (gasDifference.gt(0)) {
       console.log(
-        `✅ Enhanced swap saved ${gasDifference.toString()} gas (${percentDifference.toString()}%)`
+        `✅ Blended swap saved ${gasDifference.toString()} gas (${percentDifference.toString()}%)`
       );
     } else {
       console.log(
-        `📊 Enhanced swap used ${gasDifference
+        `📊 Blended swap used ${gasDifference
           .abs()
           .toString()} more gas (${percentDifference.abs().toString()}%)`
       );
@@ -198,7 +198,7 @@ async function testEnhancedAMM() {
       )} → ${formatEther(currentPrice)}`
     );
 
-    const ilTx = await enhancedAMM.calculateImpermanentLoss(
+    const ilTx = await blendedAMM.calculateImpermanentLoss(
       initialPrice,
       currentPrice
     );
@@ -215,7 +215,7 @@ async function testEnhancedAMM() {
     const previewAmount = parseEther("25");
 
     try {
-      const amountOut = await enhancedAMM.getAmountOut(
+      const amountOut = await blendedAMM.getAmountOut(
         previewAmount,
         CONFIG.addresses.tokenA
       );
@@ -235,23 +235,23 @@ async function testEnhancedAMM() {
     console.log("=== Test 6: Compare Liquidity Addition Methods ===");
     const testLiquidityAmount = parseEther("50");
 
-    // Enhanced method
-    console.log("Testing enhanced liquidity method...");
-    const enhancedLiqTx = await enhancedAMM.addLiquidityEnhanced(
+    // Blended method
+    console.log("Testing blended liquidity method...");
+    const blendedLiqTx = await blendedAMM.addLiquidityEnhanced(
       testLiquidityAmount,
       testLiquidityAmount,
       0,
       0,
       deployerAddress
     );
-    const enhancedLiqReceipt = await enhancedLiqTx.wait();
-    const enhancedLiqGas = enhancedLiqReceipt.gasUsed;
+    const blendedLiqReceipt = await blendedLiqTx.wait();
+    const blendedLiqGas = blendedLiqReceipt.gasUsed;
 
-    console.log(`Enhanced Method Gas: ${enhancedLiqGas.toString()}`);
+    console.log(`Blended Method Gas: ${blendedLiqGas.toString()}`);
 
     // Basic method (for comparison)
     console.log("Testing basic liquidity method...");
-    const basicLiqTx = await enhancedAMM.addLiquidity(
+    const basicLiqTx = await blendedAMM.addLiquidity(
       testLiquidityAmount,
       testLiquidityAmount,
       0,
@@ -263,27 +263,27 @@ async function testEnhancedAMM() {
 
     console.log(`Basic Method Gas: ${basicLiqGas.toString()}`);
 
-    const liqGasDiff = basicLiqGas.sub(enhancedLiqGas);
+    const liqGasDiff = basicLiqGas.sub(blendedLiqGas);
     if (liqGasDiff.gt(0)) {
       const liqPercent = liqGasDiff.mul(100).div(basicLiqGas);
       console.log(
-        `✅ Enhanced method saved ${liqGasDiff.toString()} gas (${liqPercent.toString()}%)`
+        `✅ Blended method saved ${liqGasDiff.toString()} gas (${liqPercent.toString()}%)`
       );
     } else {
       console.log(
-        `📊 Enhanced method overhead: ${liqGasDiff.abs().toString()} gas`
+        `📊 Blended method overhead: ${liqGasDiff.abs().toString()} gas`
       );
     }
     console.log();
 
-    // Test 7: Remove Enhanced Liquidity
-    console.log("=== Test 7: Remove Enhanced Liquidity ===");
-    const currentLpBalance = await enhancedAMM.balanceOf(deployerAddress);
+    // Test 7: Remove Blended Liquidity
+    console.log("=== Test 7: Remove Blended Liquidity ===");
+    const currentLpBalance = await blendedAMM.balanceOf(deployerAddress);
     const liquidityToRemove = currentLpBalance.div(6); // Remove ~16%
 
     console.log(`Removing ${formatEther(liquidityToRemove)} LP tokens...`);
 
-    const removeLiquidityTx = await enhancedAMM.removeLiquidityEnhanced(
+    const removeLiquidityTx = await blendedAMM.removeLiquidityEnhanced(
       liquidityToRemove,
       0, // amount0Min
       0, // amount1Min
@@ -297,9 +297,9 @@ async function testEnhancedAMM() {
     console.log(`Gas Used: ${removeLiquidityGas.toString()}\n`);
 
     // Final state
-    const [finalReserve0, finalReserve1] = await enhancedAMM.getReserves();
-    const finalLpBalance = await enhancedAMM.balanceOf(deployerAddress);
-    const finalTotalSupply = await enhancedAMM.totalSupply();
+    const [finalReserve0, finalReserve1] = await blendedAMM.getReserves();
+    const finalLpBalance = await blendedAMM.balanceOf(deployerAddress);
+    const finalTotalSupply = await blendedAMM.totalSupply();
 
     console.log("=== Final State ===");
     console.log(
@@ -313,13 +313,13 @@ async function testEnhancedAMM() {
     // Gas Usage Summary
     console.log("=== Gas Usage Summary ===");
     const operations = [
-      ["Enhanced Add Liquidity", addLiquidityGas],
-      ["Enhanced Swap", enhancedSwapGas],
+      ["Blended Add Liquidity", addLiquidityGas],
+      ["Blended Swap", blendedSwapGas],
       ["Basic Swap (comparison)", basicSwapGas],
       ["Impermanent Loss Calc", ilGas],
-      ["Enhanced Liquidity (test)", enhancedLiqGas],
+      ["Blended Liquidity (test)", blendedLiqGas],
       ["Basic Liquidity (test)", basicLiqGas],
-      ["Remove Enhanced Liquidity", removeLiquidityGas],
+      ["Remove Blended Liquidity", removeLiquidityGas],
     ];
 
     let totalGas = ethers.BigNumber.from(0);
@@ -334,8 +334,8 @@ async function testEnhancedAMM() {
       `${"Total".padEnd(30)}: ${totalGas.toString().padStart(8)} gas`
     );
 
-    console.log("\n✅ Enhanced AMM testing completed successfully!");
-    console.log("\n🚀 Enhanced AMM Features Demonstrated:");
+    console.log("\n✅ Blended AMM testing completed successfully!");
+    console.log("\n🚀 Blended AMM Features Demonstrated:");
     console.log("• ✅ Newton-Raphson square root (90% gas savings)");
     console.log("• ✅ High-precision slippage calculations");
     console.log("• ✅ Dynamic fee calculations with exp/log functions");
@@ -344,7 +344,7 @@ async function testEnhancedAMM() {
     console.log("• ✅ Backwards compatibility with basic functions");
     console.log("• ✅ Advanced DeFi primitives impossible in pure Solidity");
   } catch (error) {
-    console.error("❌ Enhanced AMM testing failed:", error.message);
+    console.error("❌ Blended AMM testing failed:", error.message);
     if (error.transaction) {
       console.error("Failed transaction:", error.transaction.hash);
     }
@@ -357,7 +357,7 @@ async function testEnhancedAMM() {
 
 // Run if called directly
 if (require.main === module) {
-  testEnhancedAMM();
+  testBlendedAMM();
 }
 
-module.exports = { testEnhancedAMM };
+module.exports = { testBlendedAMM };

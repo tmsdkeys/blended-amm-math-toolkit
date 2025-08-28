@@ -5,7 +5,7 @@ const {
   wallet,
   ERC20_ABI,
   BASIC_AMM_ABI,
-  ENHANCED_AMM_ABI,
+  BLENDED_AMM_ABI,
   formatEther,
   parseEther,
 } = require("./config");
@@ -40,9 +40,9 @@ async function bootstrap() {
       BASIC_AMM_ABI,
       wallet
     );
-    const enhancedAMM = new ethers.Contract(
-      CONFIG.addresses.enhancedAMM,
-      ENHANCED_AMM_ABI,
+    const blendedAMM = new ethers.Contract(
+      CONFIG.addresses.blendedAMM,
+      BLENDED_AMM_ABI,
       wallet
     );
 
@@ -50,7 +50,7 @@ async function bootstrap() {
     console.log(`  Token A: ${CONFIG.addresses.tokenA}`);
     console.log(`  Token B: ${CONFIG.addresses.tokenB}`);
     console.log(`  Basic AMM: ${CONFIG.addresses.basicAMM}`);
-    console.log(`  Enhanced AMM: ${CONFIG.addresses.enhancedAMM}`);
+    console.log(`  Blended AMM: ${CONFIG.addresses.blendedAMM}`);
     console.log(`  Math Engine: ${CONFIG.addresses.mathEngine}\n`);
 
     // Check deployer balances
@@ -96,16 +96,16 @@ async function bootstrap() {
       )
     ).wait();
 
-    console.log("Approving Enhanced AMM...");
+    console.log("Approving Blended AMM...");
     await (
       await tokenA.approve(
-        CONFIG.addresses.enhancedAMM,
+        CONFIG.addresses.blendedAMM,
         ethers.constants.MaxUint256
       )
     ).wait();
     await (
       await tokenB.approve(
-        CONFIG.addresses.enhancedAMM,
+        CONFIG.addresses.blendedAMM,
         ethers.constants.MaxUint256
       )
     ).wait();
@@ -132,10 +132,10 @@ async function bootstrap() {
     const basicLPBalance = await basicAMM.balanceOf(deployerAddress);
     console.log(`  LP Tokens Received: ${formatEther(basicLPBalance)}`);
 
-    // Add initial liquidity to Enhanced AMM
-    console.log("\nAdding liquidity to Enhanced AMM...");
+    // Add initial liquidity to Blended AMM
+    console.log("\nAdding liquidity to Blended AMM...");
 
-    const enhancedLiquidityTx = await enhancedAMM.addLiquidityEnhanced(
+    const blendedLiquidityTx = await blendedAMM.addLiquidityEnhanced(
       CONFIG.INITIAL_LIQUIDITY,
       CONFIG.INITIAL_LIQUIDITY,
       0, // amount0Min
@@ -143,27 +143,26 @@ async function bootstrap() {
       deployerAddress,
       { gasLimit: 500000 } // Explicit gas limit
     );
-    const enhancedReceipt = await enhancedLiquidityTx.wait();
-    console.log(`  TX Hash: ${enhancedReceipt.transactionHash}`);
-    console.log(`  Gas Used: ${enhancedReceipt.gasUsed.toString()}`);
+    const blendedReceipt = await blendedLiquidityTx.wait();
+    console.log(`  TX Hash: ${blendedReceipt.transactionHash}`);
+    console.log(`  Gas Used: ${blendedReceipt.gasUsed.toString()}`);
 
     // Check LP tokens received
-    const enhancedLPBalance = await enhancedAMM.balanceOf(deployerAddress);
-    console.log(`  LP Tokens Received: ${formatEther(enhancedLPBalance)}`);
+    const blendedLPBalance = await blendedAMM.balanceOf(deployerAddress);
+    console.log(`  LP Tokens Received: ${formatEther(blendedLPBalance)}`);
 
     // Verify reserves
     console.log("\n=== Verifying Reserves ===");
     const [basicReserve0, basicReserve1] = await basicAMM.getReserves();
-    const [enhancedReserve0, enhancedReserve1] =
-      await enhancedAMM.getReserves();
+    const [blendedReserve0, blendedReserve1] = await blendedAMM.getReserves();
 
     console.log("Basic AMM Reserves:");
     console.log(`  Token A: ${formatEther(basicReserve0)}`);
     console.log(`  Token B: ${formatEther(basicReserve1)}`);
 
-    console.log("Enhanced AMM Reserves:");
-    console.log(`  Token A: ${formatEther(enhancedReserve0)}`);
-    console.log(`  Token B: ${formatEther(enhancedReserve1)}\n`);
+    console.log("Blended AMM Reserves:");
+    console.log(`  Token A: ${formatEther(blendedReserve0)}`);
+    console.log(`  Token B: ${formatEther(blendedReserve1)}\n`);
 
     // Fund test accounts (simulated)
     console.log("=== Test Account Setup ===");
@@ -177,7 +176,7 @@ async function bootstrap() {
     // Display final status
     console.log("=== Bootstrap Summary ===");
     console.log("✅ Basic AMM initialized with liquidity");
-    console.log("✅ Enhanced AMM initialized with liquidity");
+    console.log("✅ Blended AMM initialized with liquidity");
     console.log("✅ Both AMMs have equal reserves for fair comparison");
     console.log("✅ Ready for gas benchmarking and testing\n");
 
@@ -185,7 +184,7 @@ async function bootstrap() {
     console.log("  npm run test-compare     # Compare gas usage between AMMs");
     console.log("  npm run test-math-engine # Test Rust math engine directly");
     console.log("  npm run test-basic       # Test Basic AMM functions");
-    console.log("  npm run test-enhanced    # Test Enhanced AMM functions");
+    console.log("  npm run test-blended    # Test Blended AMM functions");
   } catch (error) {
     console.error("❌ Bootstrap failed:", error.message);
     if (error.transaction) {

@@ -7,7 +7,7 @@ This JavaScript client provides comprehensive testing and interaction capabiliti
 This client replicates and extends the functionality of the Foundry scripts and tests, providing:
 
 - **Bootstrap functionality** to initialize deployed contracts with liquidity
-- **Comprehensive testing** of both Basic and Enhanced AMMs
+- **Comprehensive testing** of both Basic and Blended AMMs
 - **Gas benchmarking** to demonstrate Rust optimizations
 - **Direct math engine testing** to showcase advanced capabilities
 - **Real-world interaction patterns** for DeFi protocols
@@ -31,7 +31,7 @@ export PRIVATE_KEY="your-private-key-here"
 # 1. Bootstrap the deployed contracts with initial liquidity
 npm run bootstrap
 
-# 2. Compare gas usage between Basic and Enhanced AMMs
+# 2. Compare gas usage between Basic and Blended AMMs
 npm run test-compare
 
 # 3. Test the Rust mathematical engine directly
@@ -40,8 +40,8 @@ npm run test-math-engine
 # 4. Test Basic AMM functionality
 npm run test-basic
 
-# 5. Test Enhanced AMM functionality  
-npm run test-enhanced
+# 5. Test Blended AMM functionality  
+npm run test-blended
 ```
 
 ## 📋 Test Coverage
@@ -53,7 +53,7 @@ npm run test-enhanced
 - ✅ Prepares environment for benchmarking
 
 ### Gas Comparison (`npm run test-compare`)
-- ✅ Basic vs Enhanced swap operations
+- ✅ Basic vs Blended swap operations
 - ✅ Liquidity addition comparisons
 - ✅ Newton-Raphson vs Babylonian square root
 - ✅ Comprehensive gas analysis with savings calculations
@@ -73,9 +73,9 @@ npm run test-enhanced
 - ✅ Slippage calculations
 - ✅ Gas usage tracking
 
-### Enhanced AMM Testing (`npm run test-enhanced`)
-- ✅ Enhanced liquidity operations with Rust engine
-- ✅ Enhanced swaps with precision calculations
+### Blended AMM Testing (`npm run test-blended`)
+- ✅ Blended liquidity operations with Rust engine
+- ✅ Blended swaps with precision calculations
 - ✅ Impermanent loss calculations
 - ✅ Comparison with basic methods
 - ✅ Advanced DeFi primitives demonstration
@@ -94,7 +94,7 @@ const CONFIG = {
     tokenB: "0x8108c36844Faf04C091973E95aE2B725cdCb55cC", 
     mathEngine: "0x43aD2ef2fA35F2DE88E0E137429b8f6F4AeD65a2",
     basicAMM: "0xa8cD34c8bE2E492E607fc33eD092f0A81c830E06",
-    enhancedAMM: "0x2952949E6A76e3865B0bf78a07d45411985185f8"
+    blendedAMM: "0x2952949E6A76e3865B0bf78a07d45411985185f8"
   },
   
   // Test amounts
@@ -108,7 +108,7 @@ const CONFIG = {
 
 ### Gas Savings Demonstrated
 
-| Operation | Basic AMM | Enhanced AMM | Savings |
+| Operation | Basic AMM | Blended AMM | Savings |
 |-----------|-----------|--------------|---------|
 | Square Root | ~20,000 gas | ~2,000 gas | **90%** |
 | Add Liquidity | ~250,000 gas | ~180,000 gas | **28%** |
@@ -130,7 +130,7 @@ JavaScript Client
 ├── test-gas-comparison.js # Gas benchmarking suite
 ├── test-math-engine.js    # Direct Rust engine testing
 ├── test-basic-amm.js      # Basic AMM functionality tests
-└── test-enhanced-amm.js   # Enhanced AMM feature tests
+└── test-blended-amm.js   # Blended AMM feature tests
 ```
 
 ### Key Features
@@ -165,7 +165,7 @@ Error: "private key missing or invalid"
 
 ## 🎯 Benchmarking Insights
 
-### Why Enhanced AMM Sometimes Uses More Gas
+### Why Blended AMM Sometimes Uses More Gas
 
 1. **Cross-contract calls**: Additional overhead for Rust engine calls
 2. **Feature richness**: More precision and capabilities

@@ -6,7 +6,7 @@
     "scripts": {
         "bootstrap": "node bootstrap.js",
         "test-basic": "node test-basic-amm.js",
-        "test-enhanced": "node test-enhanced-amm.js",
+        "test-blended": "node test-blended-amm.js",
         "test-compare": "node test-gas-comparison.js",
         "test-math-engine": "node test-math-engine.js"
     },

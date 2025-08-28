@@ -16,7 +16,7 @@ contract DeployedGasBenchmark is Test {
     
     // Deployed contract instances
     BasicAMM public basicAmm;
-    BlendedAMM public enhancedAmm;
+    BlendedAMM public blendedAmm;
     IMathematicalEngine public mathEngine;
     IERC20 public tokenA;
     IERC20 public tokenB;
@@ -32,7 +32,7 @@ contract DeployedGasBenchmark is Test {
     // Gas measurements
     struct GasReport {
         uint256 basicGas;
-        uint256 enhancedGas;
+        uint256 blendedGas;
         int256 gasDiff;
         uint256 percentSaved;
     }
