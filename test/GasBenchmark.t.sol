@@ -151,7 +151,8 @@ contract GasBenchmarkTest is Test {
         
         // Test square root
         uint256 gasStart = gasleft();
-        uint256 sqrtResult = mathEngine.calculatePreciseSquareRoot(1000000 * 1e18);
+        bool useBabylonian = blendedAmm.useBabylonian();
+        uint256 sqrtResult = mathEngine.calculatePreciseSquareRoot(1000000 * 1e18, useBabylonian);
         uint256 sqrtGas = gasStart - gasleft();
         console.log("Square root of 1M tokens:", sqrtResult / 1e9, "(scaled down)");
         console.log("Gas used:", sqrtGas);

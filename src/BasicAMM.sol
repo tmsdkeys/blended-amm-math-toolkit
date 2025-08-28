@@ -23,11 +23,12 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
     uint256 public reserve1;
     
     uint256 public constant MINIMUM_LIQUIDITY = 1000;
-    uint256 public constant FEE_RATE = 997; // 0.3% fee (997/1000)
+    uint256 public feeRate = 997; // 0.3% fee (997/1000) - now configurable
     
     // Gas tracking for benchmarking
     uint256 public lastSwapGasUsed;
     uint256 public lastLiquidityGasUsed;
+    uint256 public lastRemoveLiquidityGasUsed;
     
     // ============ Events ============
     
@@ -55,6 +56,9 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
     
     event GasUsageRecorded(string operation, uint256 gasUsed);
     
+    // Admin events
+    event FeeRateUpdated(uint256 newFeeRate);
+    
     // ============ Constructor ============
     
     constructor(
@@ -68,6 +72,18 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         
         TOKEN0 = IERC20(_token0);
         TOKEN1 = IERC20(_token1);
+    }
+    
+    // ============ Admin Functions ============
+    
+    /**
+     * @dev Set the fee rate for swaps
+     * @param _feeRate New fee rate (e.g., 997 = 0.3% fee, 995 = 0.5% fee)
+     */
+    function setFeeRate(uint256 _feeRate) external onlyOwner {
+        require(_feeRate >= 900 && _feeRate <= 999, "Invalid fee rate"); // Between 10% and 0.1%
+        feeRate = _feeRate;
+        emit FeeRateUpdated(_feeRate);
     }
     
     // ============ Core AMM Functions ============
@@ -153,8 +169,9 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         reserve0 -= amount0;
         reserve1 -= amount1;
         
-        uint256 gasUsed = gasStart - gasleft();
-        emit GasUsageRecorded("removeLiquidity", gasUsed);
+        // Record gas usage
+        lastRemoveLiquidityGasUsed = gasStart - gasleft();
+        emit GasUsageRecorded("removeLiquidity", lastRemoveLiquidityGasUsed);
         emit LiquidityRemoved(to, amount0, amount1, liquidity);
     }
     
@@ -232,11 +249,11 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 amountIn,
         uint256 reserveIn,
         uint256 reserveOut
-    ) internal pure returns (uint256) {
+    ) internal view returns (uint256) {
         require(amountIn > 0, "Insufficient input amount");
         require(reserveIn > 0 && reserveOut > 0, "Insufficient liquidity");
         
-        uint256 amountInWithFee = amountIn * FEE_RATE;
+        uint256 amountInWithFee = amountIn * feeRate;
         uint256 numerator = amountInWithFee * reserveOut;
         uint256 denominator = (reserveIn * 1000) + amountInWithFee;
         
@@ -269,8 +286,8 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         return (reserve0, reserve1);
     }
     
-    function getGasMetrics() external view returns (uint256 swapGas, uint256 liquidityGas) {
-        return (lastSwapGasUsed, lastLiquidityGasUsed);
+    function getGasMetrics() external view returns (uint256 swapGas, uint256 addLiquidityGas, uint256 removeLiquidityGas) {
+        return (lastSwapGasUsed, lastLiquidityGasUsed, lastRemoveLiquidityGasUsed);
     }
     
     function quote(uint256 amountA, uint256 reserveA, uint256 reserveB) 

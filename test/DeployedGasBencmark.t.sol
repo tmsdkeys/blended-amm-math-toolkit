@@ -149,7 +149,8 @@ contract DeployedGasBenchmark is Test {
         // Test 1: Square Root
         uint256 testValue = 1000000 * 1e18;
         uint256 gasStart = gasleft();
-        uint256 sqrtResult = mathEngine.calculatePreciseSquareRoot(testValue);
+        bool useBabylonian = blendedAmm.useBabylonian();
+        uint256 sqrtResult = mathEngine.calculatePreciseSquareRoot(testValue, useBabylonian);
         uint256 sqrtGas = gasStart - gasleft();
         console.log("Square root of 1M tokens:", sqrtResult / 1e9);
         console.log("Gas used:", sqrtGas);
@@ -172,7 +173,7 @@ contract DeployedGasBenchmark is Test {
         uint256 currentPrice = 15 * 1e17; // 1.5x price change
         
         gasStart = gasleft();
-        uint256 il = mathEngine.calculateImpermanentLoss(initialPrice, currentPrice);
+        uint256 il = mathEngine.calculateImpermanentLoss(initialPrice, currentPrice, useBabylonian);
         uint256 ilGas = gasStart - gasleft();
         console.log("Impermanent loss:", il, "basis points");
         console.log("Gas used:", ilGas);
@@ -192,7 +193,8 @@ contract DeployedGasBenchmark is Test {
         
         // Test Rust implementation
         gasStart = gasleft();
-        uint256 rustResult = mathEngine.calculatePreciseSquareRoot(testValue);
+        bool useBabylonian = blendedAmm.useBabylonian();
+        uint256 rustResult = mathEngine.calculatePreciseSquareRoot(testValue, useBabylonian);
         uint256 rustGas = gasStart - gasleft();
         
         console.log("Test value:", testValue / 1e18);

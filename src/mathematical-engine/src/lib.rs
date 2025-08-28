@@ -67,7 +67,7 @@ struct MathematicalEngine<SDK> {
 
 /// Trait defining the mathematical engine interface
 pub trait MathematicalEngineAPI {
-    fn calculate_precise_square_root(&self, value: U256) -> U256;
+    fn calculate_precise_square_root(&self, value: U256, baby: bool) -> U256;
     fn calculate_precise_slippage(&self, params: SlippageParams) -> U256;
     fn calculate_dynamic_fee(&self, params: DynamicFeeParams) -> U256;
     fn optimize_swap_amount(
@@ -77,8 +77,13 @@ pub trait MathematicalEngineAPI {
         reserve_out: U256,
         fee_rate: U256,
     ) -> OptimizationResult;
-    fn calculate_lp_tokens(&self, amount0: U256, amount1: U256) -> U256;
-    fn calculate_impermanent_loss(&self, initial_price: U256, current_price: U256) -> U256;
+    fn calculate_lp_tokens(&self, amount0: U256, amount1: U256, baby: bool) -> U256;
+    fn calculate_impermanent_loss(
+        &self,
+        initial_price: U256,
+        current_price: U256,
+        baby: bool,
+    ) -> U256;
     fn find_optimal_route(&self, amount_in: U256, pools: Vec<Pool>, fee_rates: Vec<U256>) -> U256;
 }
 
@@ -86,9 +91,9 @@ pub trait MathematicalEngineAPI {
 impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
     /// Calculate precise square root using Newton-Raphson method
     /// More efficient than Solidity's iterative Babylonian method
-    #[function_id("calculatePreciseSquareRoot(uint256)")]
-    fn calculate_precise_square_root(&self, value: U256) -> U256 {
-        sqrt_fixed(value, true) // Use Babylonian method for reliability
+    #[function_id("calculatePreciseSquareRoot(uint256,bool)")]
+    fn calculate_precise_square_root(&self, value: U256, baby: bool) -> U256 {
+        sqrt_fixed(value, baby) // Use Babylonian method for reliability
     }
 
     /// Calculate slippage with high-precision fixed-point arithmetic
@@ -201,18 +206,23 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
 
     /// Calculate LP token amount using geometric mean
     /// More precise than Solidity's approximations
-    #[function_id("calculateLpTokens(uint256,uint256)")]
-    fn calculate_lp_tokens(&self, amount0: U256, amount1: U256) -> U256 {
+    #[function_id("calculateLpTokens(uint256,uint256,bool)")]
+    fn calculate_lp_tokens(&self, amount0: U256, amount1: U256, baby: bool) -> U256 {
         // Geometric mean: sqrt(amount0 * amount1)
         // Using high-precision fixed-point sqrt
         let product = amount0 * amount1;
-        sqrt_fixed(product, true) // Use Babylonian method for reliability
+        sqrt_fixed(product, baby) // Use Babylonian method for reliability
     }
 
     /// Calculate impermanent loss with high precision
     /// Returns loss in basis points
-    #[function_id("calculateImpermanentLoss(uint256,uint256)")]
-    fn calculate_impermanent_loss(&self, initial_price: U256, current_price: U256) -> U256 {
+    #[function_id("calculateImpermanentLoss(uint256,uint256,bool)")]
+    fn calculate_impermanent_loss(
+        &self,
+        initial_price: U256,
+        current_price: U256,
+        baby: bool,
+    ) -> U256 {
         if initial_price == U256::ZERO || current_price == U256::ZERO {
             return U256::ZERO;
         }
@@ -224,7 +234,7 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
         let price_ratio = mul_div(current_price, SCALE_18, initial_price);
 
         // Calculate sqrt of ratio
-        let sqrt_ratio = sqrt_fixed(price_ratio, true); // Use Babylonian method for reliability
+        let sqrt_ratio = sqrt_fixed(price_ratio, baby); // Use Babylonian method for reliability
 
         // Calculate IL: 2 * sqrt_ratio / (1 + price_ratio) - 1
         let numerator = U256::from(2) * sqrt_ratio;

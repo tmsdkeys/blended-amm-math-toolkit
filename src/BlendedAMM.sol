@@ -30,10 +30,16 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
     IMathematicalEngine public immutable MATH_ENGINE;
     
     // Enhanced features state
+    bool public useBabylonian = true;
     bool public dynamicFeesEnabled = true;
     uint256 public volume24h;
     uint256 public lastVolumeUpdate;
     uint256 public priceVolatility = 100; // Start at 100 basis points
+
+    // Gas tracking for benchmarking
+    uint256 public lastSwapGasUsed;
+    uint256 public lastLiquidityGasUsed;
+    uint256 public lastRemoveLiquidityGasUsed;
     
     // ============ Events ============
     
@@ -61,6 +67,14 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
     
     event DynamicFeeUpdated(uint256 newFee);
     
+    event UseBabylonianUpdated(bool newUseBabylonian);
+    event BaseFeeRateUpdated(uint256 newBaseFeeRate);
+    event DynamicFeesEnabledUpdated(bool newDynamicFeesEnabled);
+    event PriceVolatilityUpdated(uint256 newPriceVolatility);
+    
+    // Gas tracking event
+    event GasUsageRecorded(string operation, uint256 gasUsed);
+    
     // ============ Constructor ============
     
     constructor(
@@ -80,6 +94,46 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         lastVolumeUpdate = block.timestamp;
     }
     
+    // ============ Admin Functions ============
+    
+    /**
+     * @dev Set whether to use Babylonian method for calculations
+     * @param _useBabylonian New value for useBabylonian
+     */
+    function setUseBabylonian(bool _useBabylonian) external onlyOwner {
+        useBabylonian = _useBabylonian;
+        emit UseBabylonianUpdated(_useBabylonian);
+    }
+    
+    /**
+     * @dev Set the base fee rate for swaps
+     * @param _baseFeeRate New fee rate in basis points (e.g., 30 = 0.3%)
+     */
+    function setBaseFeeRate(uint256 _baseFeeRate) external onlyOwner {
+        require(_baseFeeRate <= 1000, "Fee rate too high"); // Max 10%
+        baseFeeRate = _baseFeeRate;
+        emit BaseFeeRateUpdated(_baseFeeRate);
+    }
+    
+    /**
+     * @dev Enable or disable dynamic fees
+     * @param _enabled New state for dynamic fees
+     */
+    function setDynamicFeesEnabled(bool _enabled) external onlyOwner {
+        dynamicFeesEnabled = _enabled;
+        emit DynamicFeesEnabledUpdated(_enabled);
+    }
+    
+    /**
+     * @dev Set the price volatility parameter for dynamic fee calculations
+     * @param _priceVolatility New volatility value in basis points
+     */
+    function setPriceVolatility(uint256 _priceVolatility) external onlyOwner {
+        require(_priceVolatility <= 10000, "Volatility too high"); // Max 100%
+        priceVolatility = _priceVolatility;
+        emit PriceVolatilityUpdated(_priceVolatility);
+    }
+    
     // ============ Liquidity Functions ============
     
     /**
@@ -92,6 +146,7 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 amount1Min,
         address to
     ) external nonReentrant returns (uint256 liquidity) {
+        uint256 gasStart = gasleft();
         (uint256 amount0, uint256 amount1) = _calculateOptimalAmounts(
             amount0Desired,
             amount1Desired,
@@ -106,7 +161,7 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         // Use Rust engine for precise LP token calculation
         if (totalSupply() == 0) {
             // First liquidity provider - use geometric mean via Rust
-            liquidity = MATH_ENGINE.calculateLpTokens(amount0, amount1);
+            liquidity = MATH_ENGINE.calculateLpTokens(amount0, amount1, useBabylonian);
             
             // Ensure minimum liquidity
             require(liquidity > MINIMUM_LIQUIDITY, "Insufficient initial liquidity");
@@ -126,6 +181,10 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         reserve0 += amount0;
         reserve1 += amount1;
         
+        // Record gas usage
+        lastLiquidityGasUsed = gasStart - gasleft();
+        emit GasUsageRecorded("addLiquidity", lastLiquidityGasUsed);
+        
         emit LiquidityAdded(to, amount0, amount1, liquidity);
     }
     
@@ -138,6 +197,7 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 amount1Min,
         address to
     ) external nonReentrant returns (uint256 amount0, uint256 amount1) {
+        uint256 gasStart = gasleft();
         require(liquidity > 0, "Insufficient liquidity");
         
         uint256 _totalSupply = totalSupply();
@@ -160,6 +220,10 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         require(TOKEN0.transfer(to, amount0), "TOKEN0 transfer failed");
         require(TOKEN1.transfer(to, amount1), "TOKEN1 transfer failed");
         
+        // Record gas usage
+        lastRemoveLiquidityGasUsed = gasStart - gasleft();
+        emit GasUsageRecorded("removeLiquidity", lastRemoveLiquidityGasUsed);
+        
         emit LiquidityRemoved(to, amount0, amount1, liquidity);
     }
     
@@ -174,6 +238,7 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 amountOutMin,
         address to
     ) external nonReentrant returns (uint256 amountOut) {
+        uint256 gasStart = gasleft();
         require(amountIn > 0, "Insufficient input amount");
         require(tokenIn == address(TOKEN0) || tokenIn == address(TOKEN1), "Invalid token");
         
@@ -213,6 +278,10 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         
         // Update volume tracking
         _updateVolume(amountIn);
+        
+        // Record gas usage
+        lastSwapGasUsed = gasStart - gasleft();
+        emit GasUsageRecorded("swap", lastSwapGasUsed);
         
         emit Swap(msg.sender, tokenIn, amountIn, amountOut, feeRate);
     }
@@ -282,13 +351,20 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
     }
     
     /**
+     * @dev Get gas usage metrics for benchmarking
+     */
+    function getGasMetrics() external view returns (uint256 swapGas, uint256 addLiquidityGas, uint256 removeLiquidityGas) {
+        return (lastSwapGasUsed, lastLiquidityGasUsed, lastRemoveLiquidityGasUsed);
+    }
+    
+    /**
      * @dev Calculate impermanent loss using Rust engine
      */
     function calculateImpermanentLoss(
         uint256 initialPrice,
         uint256 currentPrice
     ) external returns (uint256) {
-        return MATH_ENGINE.calculateImpermanentLoss(initialPrice, currentPrice);
+        return MATH_ENGINE.calculateImpermanentLoss(initialPrice, currentPrice, useBabylonian);
     }
     
     /**
