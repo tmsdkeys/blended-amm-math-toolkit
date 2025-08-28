@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import {Script, console} from "forge-std/Script.sol";
 import {BasicAMM} from "../src/BasicAMM.sol";
-import {EnhancedAMM} from "../src/EnhancedAMM.sol";
+import {BlendedAMM} from "../src/BlendedAMM.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
@@ -15,7 +15,7 @@ contract Bootstrap is Script {
     
     // Deployed contracts
     BasicAMM public basicAmm;
-    EnhancedAMM public enhancedAmm;
+    BlendedAMM public enhancedAmm;
     IERC20 public tokenA;
     IERC20 public tokenB;
     
@@ -61,13 +61,13 @@ contract Bootstrap is Script {
         tokenA = IERC20(vm.parseJsonAddress(deploymentData, ".tokenA"));
         tokenB = IERC20(vm.parseJsonAddress(deploymentData, ".tokenB"));
         basicAmm = BasicAMM(vm.parseJsonAddress(deploymentData, ".basicAMM"));
-        enhancedAmm = EnhancedAMM(vm.parseJsonAddress(deploymentData, ".enhancedAMM"));
+        blendedAmm = BlendedAMM(vm.parseJsonAddress(deploymentData, ".blendedAMM"));
         
         console.log("Loaded contracts:");
         console.log("  Token A:", address(tokenA));
         console.log("  Token B:", address(tokenB));
         console.log("  Basic AMM:", address(basicAmm));
-        console.log("  Enhanced AMM:", address(enhancedAmm));
+        console.log("  Blended AMM:", address(blendedAmm));
     }
     
     function setupTestAccounts() internal {
@@ -98,8 +98,8 @@ contract Bootstrap is Script {
         // Approve AMMs
         tokenA.approve(address(basicAmm), INITIAL_LIQUIDITY);
         tokenB.approve(address(basicAmm), INITIAL_LIQUIDITY);
-        tokenA.approve(address(enhancedAmm), INITIAL_LIQUIDITY);
-        tokenB.approve(address(enhancedAmm), INITIAL_LIQUIDITY);
+        tokenA.approve(address(blendedAmm), INITIAL_LIQUIDITY);
+        tokenB.approve(address(blendedAmm), INITIAL_LIQUIDITY);
         
         // Add liquidity to Basic AMM
         console.log("Adding liquidity to Basic AMM...");
@@ -112,16 +112,16 @@ contract Bootstrap is Script {
         );
         console.log("  LP tokens received:", basicLiquidity / 1e18);
         
-        // Add liquidity to Enhanced AMM
-        console.log("Adding liquidity to Enhanced AMM...");
-        uint256 enhancedLiquidity = enhancedAmm.addLiquidityEnhanced(
+        // Add liquidity to Blended AMM
+        console.log("Adding liquidity to Blended AMM...");
+        uint256 blendedLiquidity = blendedAmm.addLiquidityEnhanced(
             INITIAL_LIQUIDITY,
             INITIAL_LIQUIDITY,
             0,
             0,
             msg.sender
         );
-        console.log("  LP tokens received:", enhancedLiquidity / 1e18);
+        console.log("  LP tokens received:", blendedLiquidity / 1e18);
     }
     
     function fundTestAccounts() internal {
@@ -152,10 +152,10 @@ contract Bootstrap is Script {
         console.log("  Token A:", basicReserve0 / 1e18);
         console.log("  Token B:", basicReserve1 / 1e18);
         
-        (uint256 enhancedReserve0, uint256 enhancedReserve1) = enhancedAmm.getReserves();
-        console.log("Enhanced AMM Reserves:");
-        console.log("  Token A:", enhancedReserve0 / 1e18);
-        console.log("  Token B:", enhancedReserve1 / 1e18);
+        (uint256 blendedReserve0, uint256 blendedReserve1) = blendedAmm.getReserves();
+        console.log("Blended AMM Reserves:");
+        console.log("  Token A:", blendedReserve0 / 1e18);
+        console.log("  Token B:", blendedReserve1 / 1e18);
         
         // Check test account balances
         console.log("\nTest Account Balances:");

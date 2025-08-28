@@ -16,7 +16,7 @@ const CONFIG = {
     tokenB: "0x3785F7f6046f4401b6a7cC94397ecb42A26C7fD5",
     mathEngine: "0x60c026DEF86C3D0c7d47D260dB3010775d26a535",
     basicAMM: "0x35F8e9415caBb09F4FE9Fbb4d1955D1F076292c0",
-    enhancedAMM: "0x822cC306D92026cA0248941Cf7De7813faA27146",
+    blendedAMM: "0x822cC306D92026cA0248941Cf7De7813faA27146",
   },
 
   // Test amounts
@@ -25,8 +25,7 @@ const CONFIG = {
   TEST_TOKENS_PER_USER: ethers.utils.parseEther("5000"), // 5k tokens per user
 
   // Your private key (set this as environment variable)
-  privateKey:
-    "a1c70c54fe8100c7f9dc6f9788877f4cf4a1fedba75325c60dd38fd779ade279",
+  privateKey: process.env.PRIVATE_KEY,
 };
 
 // Helper function to load ABI from build artifacts
@@ -58,7 +57,7 @@ const wallet = new ethers.Wallet(CONFIG.privateKey, provider);
 // Load ABIs from build artifacts
 const ERC20_ABI = loadABI("ERC20");
 const BASIC_AMM_ABI = loadABI("BasicAMM");
-const ENHANCED_AMM_ABI = loadABI("EnhancedAMM");
+const BLENDED_AMM_ABI = loadABI("BlendedAMM");
 
 // Load math engine ABI from root directory
 let MATH_ENGINE_ABI = [];
@@ -102,7 +101,7 @@ module.exports = {
   wallet,
   ERC20_ABI,
   BASIC_AMM_ABI,
-  ENHANCED_AMM_ABI,
+  BLENDED_AMM_ABI,
   MATH_ENGINE_ABI,
   formatEther,
   parseEther,

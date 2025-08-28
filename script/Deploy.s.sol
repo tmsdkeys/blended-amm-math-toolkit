@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {BasicAMM} from "../src/BasicAMM.sol";
-import {EnhancedAMM} from "../src/EnhancedAMM.sol";
+import {BlendedAMM} from "../src/BlendedAMM.sol";
 
 contract Deploy is Script {
     // Deployment addresses
@@ -35,14 +35,14 @@ contract Deploy is Script {
         console.log("Basic AMM deployed at:", basicAmm);
         
         // Step 4: Deploy Enhanced AMM (with Rust math engine)
-        enhancedAmm = address(new EnhancedAMM(
+        blendedAmm = address(new BlendedAMM(
             tokenA,
             tokenB,
             mathEngine,
-            "Enhanced AMM LP",
-            "ENHANCED-LP"
+            "Blended AMM LP",
+            "BLENDED-LP"
         ));
-        console.log("Enhanced AMM deployed at:", enhancedAmm);
+        console.log("Blended AMM deployed at:", blendedAmm);
         
         // Step 5: Save deployment addresses for testing
         saveDeploymentAddresses();
@@ -54,7 +54,7 @@ contract Deploy is Script {
         console.log("Token B:", tokenB);
         console.log("Math Engine:", mathEngine);
         console.log("Basic AMM:", basicAmm);
-        console.log("Enhanced AMM:", enhancedAmm);
+        console.log("Blended AMM:", blendedAmm);
     }
     
     function deployTokenA() internal returns (address) {
@@ -92,7 +92,7 @@ contract Deploy is Script {
         vm.serializeAddress(json, "tokenB", tokenB);
         vm.serializeAddress(json, "mathEngine", mathEngine);
         vm.serializeAddress(json, "basicAMM", basicAmm);
-        string memory finalJson = vm.serializeAddress(json, "enhancedAMM", enhancedAmm);
+        string memory finalJson = vm.serializeAddress(json, "blendedAMM", blendedAmm);
         
         vm.writeJson(finalJson, "./deployment.json");
         console.log("Deployment addresses saved to deployment.json");

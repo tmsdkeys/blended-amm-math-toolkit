@@ -4,12 +4,12 @@ pragma solidity ^0.8.19;
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {BasicAMM} from "../src/BasicAMM.sol";
-import {EnhancedAMM} from "../src/EnhancedAMM.sol";
+import {BlendedAMM} from "../src/BlendedAMM.sol";
 import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol";
 
 contract GasBenchmarkTest is Test {
     BasicAMM public basicAmm;
-    EnhancedAMM public enhancedAmm;
+    BlendedAMM public blendedAmm;
     IMathematicalEngine public mathEngine;
     
     address public tokenA;
@@ -33,12 +33,12 @@ contract GasBenchmarkTest is Test {
         
         // Deploy AMMs
         basicAmm = new BasicAMM(tokenA, tokenB, "Basic LP", "BLP");
-        enhancedAmm = new EnhancedAMM(
+        blendedAmm = new BlendedAMM(
             tokenA,
             tokenB,
             address(mathEngine),
-            "Enhanced LP",
-            "ELP"
+            "Blended LP",
+            "BLP"
         );
         
         // Setup test accounts
@@ -71,15 +71,15 @@ contract GasBenchmarkTest is Test {
         vm.startPrank(alice);
         MockERC20(tokenA).approve(address(basicAmm), type(uint256).max);
         MockERC20(tokenB).approve(address(basicAmm), type(uint256).max);
-        MockERC20(tokenA).approve(address(enhancedAmm), type(uint256).max);
-        MockERC20(tokenB).approve(address(enhancedAmm), type(uint256).max);
+        MockERC20(tokenA).approve(address(blendedAmm), type(uint256).max);
+        MockERC20(tokenB).approve(address(blendedAmm), type(uint256).max);
         vm.stopPrank();
         
         vm.startPrank(bob);
         MockERC20(tokenA).approve(address(basicAmm), type(uint256).max);
         MockERC20(tokenB).approve(address(basicAmm), type(uint256).max);
-        MockERC20(tokenA).approve(address(enhancedAmm), type(uint256).max);
-        MockERC20(tokenB).approve(address(enhancedAmm), type(uint256).max);
+        MockERC20(tokenA).approve(address(blendedAmm), type(uint256).max);
+        MockERC20(tokenB).approve(address(blendedAmm), type(uint256).max);
         vm.stopPrank();
     }
     
@@ -93,22 +93,22 @@ contract GasBenchmarkTest is Test {
         basicAmm.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
         uint256 basicGas = gasStart - gasleft();
         
-        // Measure Enhanced AMM
+        // Measure Blended AMM
         gasStart = gasleft();
-        enhancedAmm.addLiquidityEnhanced(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
-        uint256 enhancedGas = gasStart - gasleft();
+        blendedAmm.addLiquidityEnhanced(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
+        uint256 blendedGas = gasStart - gasleft();
         
         vm.stopPrank();
         
         // Report results
         console.log("Basic AMM gas:", basicGas);
-        console.log("Enhanced AMM gas:", enhancedGas);
+        console.log("Blended AMM gas:", blendedGas);
         
-        if (enhancedGas < basicGas) {
-            uint256 savings = ((basicGas - enhancedGas) * 100) / basicGas;
+        if (blendedGas < basicGas) {
+            uint256 savings = ((basicGas - blendedGas) * 100) / basicGas;
             console.log("Gas savings:", savings, "%");
         } else {
-            uint256 increase = ((enhancedGas - basicGas) * 100) / basicGas;
+            uint256 increase = ((blendedGas - basicGas) * 100) / basicGas;
             console.log("Gas increase:", increase, "%");
         }
     }
@@ -117,7 +117,7 @@ contract GasBenchmarkTest is Test {
         // First add liquidity
         vm.startPrank(alice);
         basicAmm.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
-        enhancedAmm.addLiquidityEnhanced(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
+        blendedAmm.addLiquidityEnhanced(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
         vm.stopPrank();
         
         console.log("\n=== Swap Gas Comparison ===");
@@ -129,19 +129,19 @@ contract GasBenchmarkTest is Test {
         basicAmm.swap(tokenA, SWAP_AMOUNT, 0, bob);
         uint256 basicGas = gasStart - gasleft();
         
-        // Measure Enhanced AMM swap
+        // Measure Blended AMM swap
         gasStart = gasleft();
-        enhancedAmm.swapEnhanced(tokenA, SWAP_AMOUNT, 0, bob);
-        uint256 enhancedGas = gasStart - gasleft();
+        blendedAmm.swapEnhanced(tokenA, SWAP_AMOUNT, 0, bob);
+        uint256 blendedGas = gasStart - gasleft();
         
         vm.stopPrank();
         
         // Report results
         console.log("Basic AMM gas:", basicGas);
-        console.log("Enhanced AMM gas:", enhancedGas);
+        console.log("Blended AMM gas:", blendedGas);
         
-        if (enhancedGas < basicGas) {
-            uint256 savings = ((basicGas - enhancedGas) * 100) / basicGas;
+        if (blendedGas < basicGas) {
+            uint256 savings = ((basicGas - blendedGas) * 100) / basicGas;
             console.log("Gas savings:", savings, "%");
         }
     }

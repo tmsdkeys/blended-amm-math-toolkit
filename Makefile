@@ -57,7 +57,7 @@ deploy-amm: build ## Deploy AMM contracts standalone
 	@echo "$(GREEN)✓ Basic AMM deployed$(NC)"
 	
 	@echo "$(BLUE)Deploying Enhanced AMM...$(NC)"
-	gblend create src/EnhancedAMM.sol:EnhancedAMM \
+	gblend create src/BlendedAMM.sol:BlendedAMM \
 		--rpc-url fluent-testnet \
 		--private-key $PRIVATE_KEY \
 		--broadcast \

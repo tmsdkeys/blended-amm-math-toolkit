@@ -9,11 +9,11 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol";
 
 /**
- * @title EnhancedAMM
+ * @title BlendedAMM
  * @dev Blended execution AMM that leverages Rust mathematical engine
  * for high-precision calculations and advanced features
  */
-contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
+contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
     
     // ============ State Variables ============
     

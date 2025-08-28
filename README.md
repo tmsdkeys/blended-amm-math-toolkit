@@ -7,9 +7,9 @@ A demonstration of Fluentbase's blended execution capabilities, showcasing how R
 This project implements an Automated Market Maker (AMM) with two versions:
 
 - **BasicAMM**: Pure Solidity implementation (baseline)
-- **EnhancedAMM**: Blended execution using a Rust mathematical engine
+- **BlendedAMM**: Blended execution using a Rust mathematical engine
 
-The Enhanced AMM leverages Rust for computationally expensive operations, demonstrating:
+The Blended AMM leverages Rust for computationally expensive operations, demonstrating:
 
 - **90% gas reduction** on mathematical operations like square root
 - **Advanced capabilities** impossible in Solidity (exponential/logarithmic functions)
@@ -83,7 +83,7 @@ make snapshot
 
 TODO: Update with real reproducible numbers
 
-| Operation | Basic AMM (Solidity) | Enhanced AMM (Rust) | Savings |
+| Operation | Basic AMM (Solidity) | Blended AMM (Rust) | Savings |
 |-----------|---------------------|---------------------|---------|
 | Square Root | ~20,000 gas | ~2,000 gas | **90%** |
 | Add Liquidity (first) | ~250,000 gas | ~180,000 gas | **28%** |
@@ -134,7 +134,7 @@ pub trait MathematicalEngineAPI {
 
 ### Solidity Integration
 
-The Enhanced AMM seamlessly calls Rust functions:
+The Blended AMM seamlessly calls Rust functions:
 
 ```solidity
 // Simple interface call - no complex ABI encoding needed
@@ -155,7 +155,7 @@ uint256 fee = mathEngine.calculateDynamicFee(params);
 ```
 ├── src/
 │   ├── BasicAMM.sol              # Pure Solidity AMM (baseline)
-│   └── EnhancedAMM.sol           # Blended execution AMM
+│   └── BlendedAMM.sol           # Blended execution AMM
 ├── rust-contracts/
 │   ├── src/
 │   │   └── lib.rs                # Rust mathematical engine
