@@ -285,35 +285,74 @@ fn sqrt_fixed(x: U256) -> U256 {
         return U256::from(1);
     }
 
-    // Initial guess: find the highest set bit and use 2^(bit_position/2)
-    let mut z = x;
+    // FIXED: Better initial guess that doesn't cause massive scaling issues
     let mut y = x;
+    let mut z = x;
 
-    // Optimize initial guess using bit manipulation
-    if x >= U256::from(2).pow(U256::from(128)) {
-        y = U256::from(2).pow(U256::from(128));
-    } else if x >= U256::from(2).pow(U256::from(64)) {
-        y = U256::from(2).pow(U256::from(64));
-    } else if x >= U256::from(2).pow(U256::from(32)) {
-        y = U256::from(2).pow(U256::from(32));
-    } else if x >= U256::from(2).pow(U256::from(16)) {
-        y = U256::from(2).pow(U256::from(16));
-    } else {
-        y = x / U256::from(2);
+    // Get a reasonable initial guess by bit shifting
+    // Find the position of the most significant bit
+    let mut temp = x;
+    let mut bit_position = 0u32;
+
+    while temp > U256::ZERO {
+        temp = temp >> 1;
+        bit_position += 1;
     }
 
-    // Newton-Raphson iteration: y = (y + x/y) / 2
+    // Initial guess: 2^(bit_position/2)
+    // This prevents the massive scaling issues we saw
+    if bit_position > 1 {
+        y = U256::from(1) << (bit_position / 2);
+    } else {
+        y = U256::from(1);
+    }
+
+    // Newton-Raphson iteration: y_new = (y + x/y) / 2
     for _ in 0..MAX_ITERATIONS {
         z = y;
+
+        // Prevent division by zero
+        if y == U256::ZERO {
+            break;
+        }
+
         y = (y + x / y) / U256::from(2);
 
-        // Check for convergence
+        // Check for convergence (when improvement is minimal)
         if y >= z {
             return z;
         }
+
+        // Additional convergence check - if the difference is tiny, stop
+        let diff = if z > y { z - y } else { y - z };
+        if diff <= U256::from(1) {
+            return y;
+        }
     }
 
-    z
+    y
+}
+
+// Alternative implementation that's more conservative and matches Solidity behavior
+fn sqrt_fixed_conservative(x: U256) -> U256 {
+    if x == U256::ZERO {
+        return U256::ZERO;
+    }
+    if x == U256::from(1) {
+        return U256::from(1);
+    }
+
+    // Use the same approach as Solidity Babylonian method for consistency
+    let mut z = (x + U256::from(1)) / U256::from(2);
+    let mut y = x;
+
+    // This mimics exactly what Solidity does
+    while z < y {
+        y = z;
+        z = (x / z + z) / U256::from(2);
+    }
+
+    y
 }
 
 /// Approximated exponential function using Taylor series
@@ -424,14 +463,42 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sqrt() {
+    fn test_sqrt_fixed() {
+        // Test basic cases
         assert_eq!(sqrt_fixed(U256::from(0)), U256::from(0));
         assert_eq!(sqrt_fixed(U256::from(1)), U256::from(1));
         assert_eq!(sqrt_fixed(U256::from(4)), U256::from(2));
         assert_eq!(sqrt_fixed(U256::from(9)), U256::from(3));
         assert_eq!(sqrt_fixed(U256::from(16)), U256::from(4));
-        assert_eq!(sqrt_fixed(U256::from(625)), U256::from(25));
-        assert_eq!(sqrt_fixed(U256::from(1000000)), U256::from(1000));
+        assert_eq!(sqrt_fixed(U256::from(25)), U256::from(5));
+        assert_eq!(sqrt_fixed(U256::from(100)), U256::from(10));
+        assert_eq!(sqrt_fixed(U256::from(10000)), U256::from(100));
+
+        // Test with typical LP token calculation values
+        // If amount0 = 10000e18 and amount1 = 10000e18
+        let amount0 = U256::from(10000u64) * SCALE_18;
+        let amount1 = U256::from(10000u64) * SCALE_18;
+        let product = amount0 * amount1; // This will be 10000^2 * 1e36
+        let sqrt_result = sqrt_fixed(product);
+
+        // Expected: sqrt(10000^2 * 1e36) = 10000 * 1e18
+        let expected = U256::from(10000u64) * SCALE_18;
+
+        // Allow for small rounding differences
+        let diff = if sqrt_result > expected {
+            sqrt_result - expected
+        } else {
+            expected - sqrt_result
+        };
+
+        // Should be very close (within 0.001%)
+        assert!(
+            diff < expected / U256::from(100000),
+            "sqrt_result: {}, expected: {}, diff: {}",
+            sqrt_result,
+            expected,
+            diff
+        );
     }
 
     #[test]
