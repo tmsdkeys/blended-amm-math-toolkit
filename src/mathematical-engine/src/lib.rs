@@ -88,7 +88,7 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
     /// More efficient than Solidity's iterative Babylonian method
     #[function_id("calculatePreciseSquareRoot(uint256)")]
     fn calculate_precise_square_root(&self, value: U256) -> U256 {
-        sqrt_fixed(value)
+        sqrt_fixed(value, true) // Use Babylonian method for reliability
     }
 
     /// Calculate slippage with high-precision fixed-point arithmetic
@@ -169,7 +169,7 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
 
         // Calculate using fixed-point square root
         let inner = mul_div(k, total_amount * fee_multiplier, BASIS_POINTS);
-        let optimal_ratio = sqrt_fixed(inner);
+        let optimal_ratio = sqrt_fixed(inner, true); // Use Babylonian method for reliability
         let optimal_amount = optimal_ratio.min(total_amount);
 
         // Calculate expected output with high precision
@@ -206,7 +206,7 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
         // Geometric mean: sqrt(amount0 * amount1)
         // Using high-precision fixed-point sqrt
         let product = amount0 * amount1;
-        sqrt_fixed(product)
+        sqrt_fixed(product, true) // Use Babylonian method for reliability
     }
 
     /// Calculate impermanent loss with high precision
@@ -224,7 +224,7 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
         let price_ratio = mul_div(current_price, SCALE_18, initial_price);
 
         // Calculate sqrt of ratio
-        let sqrt_ratio = sqrt_fixed(price_ratio);
+        let sqrt_ratio = sqrt_fixed(price_ratio, true); // Use Babylonian method for reliability
 
         // Calculate IL: 2 * sqrt_ratio / (1 + price_ratio) - 1
         let numerator = U256::from(2) * sqrt_ratio;
@@ -275,66 +275,48 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
 
 // ============ Fixed-Point Mathematical Functions ============
 
-/// High-precision square root using Newton-Raphson method
-/// Optimized for U256 with early exit conditions
-fn sqrt_fixed(x: U256) -> U256 {
-    if x == U256::ZERO {
-        return U256::ZERO;
-    }
-    if x <= U256::from(3) {
-        return U256::from(1);
-    }
-
-    // FIXED: Better initial guess that doesn't cause massive scaling issues
-    let mut y = x;
-    let mut z = x;
-
-    // Get a reasonable initial guess by bit shifting
-    // Find the position of the most significant bit
-    let mut temp = x;
-    let mut bit_position = 0u32;
-
-    while temp > U256::ZERO {
-        temp = temp >> 1;
-        bit_position += 1;
-    }
-
-    // Initial guess: 2^(bit_position/2)
-    // This prevents the massive scaling issues we saw
-    if bit_position > 1 {
-        y = U256::from(1) << (bit_position / 2);
+/// Wrapper function that chooses between Babylonian and Newton-Raphson methods
+/// baby: true = Babylonian method (more reliable for large numbers)
+/// baby: false = Newton-Raphson method (higher precision)
+fn sqrt_fixed(x: U256, baby: bool) -> U256 {
+    if baby {
+        sqrt_fixed_babylonian(x)
     } else {
-        y = U256::from(1);
+        sqrt_fixed_newton_raphson(x)
+    }
+}
+
+/// Newton-Raphson method with optimizations for large numbers
+fn sqrt_fixed_newton_raphson(x: U256) -> U256 {
+    if x <= U256::from(1) {
+        return x;
     }
 
-    // Newton-Raphson iteration: y_new = (y + x/y) / 2
-    for _ in 0..MAX_ITERATIONS {
-        z = y;
-
-        // Prevent division by zero
-        if y == U256::ZERO {
-            break;
-        }
-
-        y = (y + x / y) / U256::from(2);
-
-        // Check for convergence (when improvement is minimal)
-        if y >= z {
-            return z;
-        }
-
-        // Additional convergence check - if the difference is tiny, stop
-        let diff = if z > y { z - y } else { y - z };
-        if diff <= U256::from(1) {
-            return y;
-        }
+    // Better initial guess: find highest bit and start from there
+    let mut bit = U256::from(1);
+    let mut temp = x;
+    while temp > bit {
+        bit = bit << 2;
+        temp = temp >> 2;
     }
 
+    let mut y = bit;
+
+    for _ in 0..20 {
+        // More iterations for convergence
+        let prev_y = y;
+        y = (y + x / y) >> 1;
+
+        if y >= prev_y {
+            return prev_y;
+        }
+    }
     y
 }
 
-// Alternative implementation that's more conservative and matches Solidity behavior
-fn sqrt_fixed_conservative(x: U256) -> U256 {
+/// Primary square root implementation using Babylonian method
+/// More reliable for large EVM numbers and matches Solidity behavior
+fn sqrt_fixed_babylonian(x: U256) -> U256 {
     if x == U256::ZERO {
         return U256::ZERO;
     }
@@ -463,23 +445,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sqrt_fixed() {
+    fn test_sqrt_fixed_babylonian() {
         // Test basic cases
-        assert_eq!(sqrt_fixed(U256::from(0)), U256::from(0));
-        assert_eq!(sqrt_fixed(U256::from(1)), U256::from(1));
-        assert_eq!(sqrt_fixed(U256::from(4)), U256::from(2));
-        assert_eq!(sqrt_fixed(U256::from(9)), U256::from(3));
-        assert_eq!(sqrt_fixed(U256::from(16)), U256::from(4));
-        assert_eq!(sqrt_fixed(U256::from(25)), U256::from(5));
-        assert_eq!(sqrt_fixed(U256::from(100)), U256::from(10));
-        assert_eq!(sqrt_fixed(U256::from(10000)), U256::from(100));
+        assert_eq!(sqrt_fixed_babylonian(U256::from(0)), U256::from(0));
+        assert_eq!(sqrt_fixed_babylonian(U256::from(1)), U256::from(1));
+        assert_eq!(sqrt_fixed_babylonian(U256::from(4)), U256::from(2));
+        assert_eq!(sqrt_fixed_babylonian(U256::from(9)), U256::from(3));
+        assert_eq!(sqrt_fixed_babylonian(U256::from(16)), U256::from(4));
+        assert_eq!(sqrt_fixed_babylonian(U256::from(25)), U256::from(5));
+        assert_eq!(sqrt_fixed_babylonian(U256::from(100)), U256::from(10));
+        assert_eq!(sqrt_fixed_babylonian(U256::from(10000)), U256::from(100));
 
         // Test with typical LP token calculation values
         // If amount0 = 10000e18 and amount1 = 10000e18
         let amount0 = U256::from(10000u64) * SCALE_18;
         let amount1 = U256::from(10000u64) * SCALE_18;
         let product = amount0 * amount1; // This will be 10000^2 * 1e36
-        let sqrt_result = sqrt_fixed(product);
+        let sqrt_result = sqrt_fixed_babylonian(product);
 
         // Expected: sqrt(10000^2 * 1e36) = 10000 * 1e18
         let expected = U256::from(10000u64) * SCALE_18;
@@ -499,6 +481,62 @@ mod tests {
             expected,
             diff
         );
+    }
+
+    #[test]
+    fn test_sqrt_fixed_newton_raphson() {
+        // Test basic cases for Newton-Raphson implementation
+        assert_eq!(sqrt_fixed_newton_raphson(U256::from(0)), U256::from(0));
+        assert_eq!(sqrt_fixed_newton_raphson(U256::from(1)), U256::from(1));
+        assert_eq!(sqrt_fixed_newton_raphson(U256::from(4)), U256::from(2));
+        assert_eq!(sqrt_fixed_newton_raphson(U256::from(9)), U256::from(3));
+        assert_eq!(sqrt_fixed_newton_raphson(U256::from(16)), U256::from(4));
+        assert_eq!(sqrt_fixed_newton_raphson(U256::from(25)), U256::from(5));
+        assert_eq!(sqrt_fixed_newton_raphson(U256::from(100)), U256::from(10));
+        assert_eq!(
+            sqrt_fixed_newton_raphson(U256::from(10000)),
+            U256::from(100)
+        );
+
+        // Test with typical LP token calculation values
+        let amount0 = U256::from(10000u64) * SCALE_18;
+        let amount1 = U256::from(10000u64) * SCALE_18;
+        let product = amount0 * amount1;
+        let sqrt_result = sqrt_fixed_newton_raphson(product);
+        let expected = U256::from(10000u64) * SCALE_18;
+
+        let diff = if sqrt_result > expected {
+            sqrt_result - expected
+        } else {
+            expected - sqrt_result
+        };
+
+        // Newton-Raphson should also be very close
+        assert!(
+            diff < expected / U256::from(100000),
+            "Newton-Raphson sqrt_result: {}, expected: {}, diff: {}",
+            sqrt_result,
+            expected,
+            diff
+        );
+    }
+
+    #[test]
+    fn test_sqrt_fixed_wrapper() {
+        // Simple tests
+        assert_eq!(
+            sqrt_fixed_point(U256::from(25), U256::from(1)),
+            U256::from(5)
+        );
+
+        // Fixed-point test with SCALE_18
+        let base = U256::from(10000u64);
+        let large_value = base * base * SCALE_18; // 10000^2 * e18
+
+        let result = sqrt_fixed_point(large_value / SCALE_18, SCALE_18); // Normalize input
+        let expected = base * SCALE_18; // 10000 * e18
+
+        assert_eq!(result, expected);
     }
 
     #[test]
