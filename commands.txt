@@ -13,3 +13,24 @@ gblend script script/Bootstrap.s.sol:Bootstrap \
     --private-key $PRIVATE_KEY \
     --broadcast \
     -vvv
+
+gblend create MathematicalEngine.wasm \
+    --rpc-url https://rpc.testnet.fluent.xyz \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    --verify \
+    --wasm \
+    --verifier blockscout \
+    --verifier-url https://testnet.fluentscan.xyz/api/
+
+gblend create src/EnhancedAMM.sol:EnhancedAMM \
+    --rpc-url $RPC_URL \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    --constructor-args $TOKEN_A $TOKEN_B $MATH_ENGINE "EnhancedAMM-LPToken" "ESOLTRUST-LP" 
+
+forge create src/BasicAMM.sol:BasicAMM \
+    --rpc-url https://rpc.testnet.fluent.xyz \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    --constructor-args $TOKEN_A $TOKEN_B "Basic AMM SOLTRUST LP Token" "SOLTRUST-LP"

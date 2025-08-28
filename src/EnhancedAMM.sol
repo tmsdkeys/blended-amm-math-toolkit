@@ -111,7 +111,7 @@ contract EnhancedAMM is ERC20, ReentrancyGuard, Ownable {
             // Ensure minimum liquidity
             require(liquidity > MINIMUM_LIQUIDITY, "Insufficient initial liquidity");
             liquidity = liquidity - MINIMUM_LIQUIDITY;
-            _mint(address(0), MINIMUM_LIQUIDITY); // Lock minimum liquidity
+            _mint(address(this), MINIMUM_LIQUIDITY); // Lock minimum liquidity
         } else {
             // Calculate proportional liquidity
             uint256 liquidity0 = (amount0 * totalSupply()) / reserve0;

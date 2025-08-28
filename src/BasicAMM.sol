@@ -100,7 +100,7 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
         if (totalSupply() == 0) {
             // First liquidity provider
             liquidity = _sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
-            _mint(address(0), MINIMUM_LIQUIDITY); // Lock minimum liquidity
+            _mint(address(this), MINIMUM_LIQUIDITY); // Lock minimum liquidity
         } else {
             // Subsequent liquidity providers
             liquidity = _min(
