@@ -88,7 +88,7 @@ contract DeployedGasBenchmark is Test {
         // Test Blended AMM swap
         vm.prank(bob);
         gasStart = gasleft();
-        blendedAmm.swapEnhanced(address(tokenA), SWAP_AMOUNT, 0, bob);
+        blendedAmm.swap(address(tokenA), SWAP_AMOUNT, 0, bob);
         uint256 blendedGas = gasStart - gasleft();
         
         // Report results
@@ -130,7 +130,7 @@ contract DeployedGasBenchmark is Test {
         // Test Blended AMM add liquidity
         vm.prank(alice);
         gasStart = gasleft();
-        blendedAmm.addLiquidityEnhanced(
+        blendedAmm.addLiquidity(
             LIQUIDITY_AMOUNT,
             LIQUIDITY_AMOUNT,
             LIQUIDITY_AMOUNT * 95 / 100,

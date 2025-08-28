@@ -135,7 +135,7 @@ async function bootstrap() {
     // Add initial liquidity to Blended AMM
     console.log("\nAdding liquidity to Blended AMM...");
 
-    const blendedLiquidityTx = await blendedAMM.addLiquidityEnhanced(
+    const blendedLiquidityTx = await blendedAMM.addLiquidity(
       CONFIG.INITIAL_LIQUIDITY,
       CONFIG.INITIAL_LIQUIDITY,
       0, // amount0Min

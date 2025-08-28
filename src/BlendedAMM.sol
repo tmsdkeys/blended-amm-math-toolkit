@@ -37,7 +37,7 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
     
     // ============ Events ============
     
-    event SwapEnhanced(
+    event Swap(
         address indexed user,
         address indexed tokenIn,
         uint256 amountIn,
@@ -45,7 +45,7 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         uint256 dynamicFee
     );
     
-    event LiquidityAddedEnhanced(
+    event LiquidityAdded(
         address indexed provider,
         uint256 amount0,
         uint256 amount1,
@@ -80,12 +80,12 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         lastVolumeUpdate = block.timestamp;
     }
     
-    // ============ Enhanced Liquidity Functions ============
+    // ============ Liquidity Functions ============
     
     /**
      * @dev Add liquidity using Rust-powered precise calculations
      */
-    function addLiquidityEnhanced(
+    function addLiquidity(
         uint256 amount0Desired,
         uint256 amount1Desired,
         uint256 amount0Min,
@@ -126,13 +126,13 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         reserve0 += amount0;
         reserve1 += amount1;
         
-        emit LiquidityAddedEnhanced(to, amount0, amount1, liquidity);
+        emit LiquidityAdded(to, amount0, amount1, liquidity);
     }
     
     /**
      * @dev Remove liquidity
      */
-    function removeLiquidityEnhanced(
+    function removeLiquidity(
         uint256 liquidity,
         uint256 amount0Min,
         uint256 amount1Min,
@@ -163,12 +163,12 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         emit LiquidityRemoved(to, amount0, amount1, liquidity);
     }
     
-    // ============ Enhanced Swap Functions ============
+    // ============ Swap Functions ============
     
     /**
-     * @dev Enhanced swap using Rust engine for optimization
+     * @dev Swap using Rust engine for optimization
      */
-    function swapEnhanced(
+    function swap(
         address tokenIn,
         uint256 amountIn,
         uint256 amountOutMin,
@@ -214,120 +214,7 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
         // Update volume tracking
         _updateVolume(amountIn);
         
-        emit SwapEnhanced(msg.sender, tokenIn, amountIn, amountOut, feeRate);
-    }
-    
-    /**
-     * @dev Basic swap for comparison (pure Solidity)
-     */
-    function swap(
-        address tokenIn,
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address to
-    ) external nonReentrant returns (uint256 amountOut) {
-        require(amountIn > 0, "Insufficient input amount");
-        require(tokenIn == address(TOKEN0) || tokenIn == address(TOKEN1), "Invalid token");
-        
-        bool isToken0 = tokenIn == address(TOKEN0);
-        (uint256 reserveIn, uint256 reserveOut) = isToken0 
-            ? (reserve0, reserve1) 
-            : (reserve1, reserve0);
-        
-        // Basic constant product formula
-        uint256 amountInWithFee = amountIn * (10000 - baseFeeRate);
-        uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = reserveIn * 10000 + amountInWithFee;
-        amountOut = numerator / denominator;
-        
-        require(amountOut >= amountOutMin, "Insufficient output amount");
-        
-        // Execute swap
-        require(IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn), "Token transfer failed");
-        
-        if (isToken0) {
-            require(TOKEN1.transfer(to, amountOut), "TOKEN1 transfer failed");
-            reserve0 += amountIn;
-            reserve1 -= amountOut;
-        } else {
-            require(TOKEN0.transfer(to, amountOut), "TOKEN0 transfer failed");
-            reserve1 += amountIn;
-            reserve0 -= amountOut;
-        }
-    }
-    
-    // ============ Basic Liquidity Functions (for comparison) ============
-    
-    /**
-     * @dev Basic add liquidity for comparison
-     */
-    function addLiquidity(
-        uint256 amount0Desired,
-        uint256 amount1Desired,
-        uint256 amount0Min,
-        uint256 amount1Min,
-        address to
-    ) external nonReentrant returns (uint256 liquidity) {
-        (uint256 amount0, uint256 amount1) = _calculateOptimalAmounts(
-            amount0Desired,
-            amount1Desired,
-            amount0Min,
-            amount1Min
-        );
-        
-        // Transfer tokens
-        require(TOKEN0.transferFrom(msg.sender, address(this), amount0), "TOKEN0 transfer failed");
-        require(TOKEN1.transferFrom(msg.sender, address(this), amount1), "TOKEN1 transfer failed");
-        
-        // Basic liquidity calculation
-        if (totalSupply() == 0) {
-            // Use Babylonian square root (less efficient)
-            liquidity = _sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
-            _mint(address(0), MINIMUM_LIQUIDITY);
-        } else {
-            uint256 liquidity0 = (amount0 * totalSupply()) / reserve0;
-            uint256 liquidity1 = (amount1 * totalSupply()) / reserve1;
-            liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-        }
-        
-        require(liquidity > 0, "Insufficient liquidity minted");
-        _mint(to, liquidity);
-        
-        // Update reserves
-        reserve0 += amount0;
-        reserve1 += amount1;
-    }
-    
-    /**
-     * @dev Basic remove liquidity for comparison
-     */
-    function removeLiquidity(
-        uint256 liquidity,
-        uint256 amount0Min,
-        uint256 amount1Min,
-        address to
-    ) external nonReentrant returns (uint256 amount0, uint256 amount1) {
-        require(liquidity > 0, "Insufficient liquidity");
-        
-        uint256 _totalSupply = totalSupply();
-        
-        // Calculate amounts
-        amount0 = (liquidity * reserve0) / _totalSupply;
-        amount1 = (liquidity * reserve1) / _totalSupply;
-        
-        require(amount0 >= amount0Min, "Insufficient amount0");
-        require(amount1 >= amount1Min, "Insufficient amount1");
-        
-        // Burn LP tokens
-        _burn(msg.sender, liquidity);
-        
-        // Update reserves
-        reserve0 -= amount0;
-        reserve1 -= amount1;
-        
-        // Transfer tokens
-        require(TOKEN0.transfer(to, amount0), "TOKEN0 transfer failed");
-        require(TOKEN1.transfer(to, amount1), "TOKEN1 transfer failed");
+        emit Swap(msg.sender, tokenIn, amountIn, amountOut, feeRate);
     }
     
     // ============ Helper Functions ============
@@ -382,19 +269,6 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
             lastVolumeUpdate = block.timestamp;
         } else {
             volume24h += amount;
-        }
-    }
-    
-    /**
-     * @dev Babylonian square root (for comparison with Rust version)
-     */
-    function _sqrt(uint256 x) internal pure returns (uint256 y) {
-        if (x == 0) return 0;
-        uint256 z = (x + 1) / 2;
-        y = x;
-        while (z < y) {
-            y = z;
-            z = (x / z + z) / 2;
         }
     }
     

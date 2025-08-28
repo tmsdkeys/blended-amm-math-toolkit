@@ -78,7 +78,7 @@ async function testBlendedAMM() {
       )} of each token using Rust engine...`
     );
 
-    const addLiquidityTx = await blendedAMM.addLiquidityEnhanced(
+    const addLiquidityTx = await blendedAMM.addLiquidity(
       liquidityAmount,
       liquidityAmount,
       0, // amount0Min
@@ -114,7 +114,7 @@ async function testBlendedAMM() {
       `Swapping ${formatEther(swapAmount)} Token A using blended engine...`
     );
 
-    const blendedSwapTx = await blendedAMM.swapEnhanced(
+    const blendedSwapTx = await blendedAMM.swap(
       CONFIG.addresses.tokenA,
       swapAmount,
       0, // amountOutMin
@@ -237,7 +237,7 @@ async function testBlendedAMM() {
 
     // Blended method
     console.log("Testing blended liquidity method...");
-    const blendedLiqTx = await blendedAMM.addLiquidityEnhanced(
+    const blendedLiqTx = await blendedAMM.addLiquidity(
       testLiquidityAmount,
       testLiquidityAmount,
       0,
@@ -283,7 +283,7 @@ async function testBlendedAMM() {
 
     console.log(`Removing ${formatEther(liquidityToRemove)} LP tokens...`);
 
-    const removeLiquidityTx = await blendedAMM.removeLiquidityEnhanced(
+    const removeLiquidityTx = await blendedAMM.removeLiquidity(
       liquidityToRemove,
       0, // amount0Min
       0, // amount1Min

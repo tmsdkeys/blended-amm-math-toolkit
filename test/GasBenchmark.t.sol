@@ -95,7 +95,7 @@ contract GasBenchmarkTest is Test {
         
         // Measure Blended AMM
         gasStart = gasleft();
-        blendedAmm.addLiquidityEnhanced(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
+        blendedAmm.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
         uint256 blendedGas = gasStart - gasleft();
         
         vm.stopPrank();
@@ -117,7 +117,7 @@ contract GasBenchmarkTest is Test {
         // First add liquidity
         vm.startPrank(alice);
         basicAmm.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
-        blendedAmm.addLiquidityEnhanced(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
+        blendedAmm.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, alice);
         vm.stopPrank();
         
         console.log("\n=== Swap Gas Comparison ===");
@@ -131,7 +131,7 @@ contract GasBenchmarkTest is Test {
         
         // Measure Blended AMM swap
         gasStart = gasleft();
-        blendedAmm.swapEnhanced(tokenA, SWAP_AMOUNT, 0, bob);
+        blendedAmm.swap(tokenA, SWAP_AMOUNT, 0, bob);
         uint256 blendedGas = gasStart - gasleft();
         
         vm.stopPrank();

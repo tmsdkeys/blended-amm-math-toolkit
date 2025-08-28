@@ -212,7 +212,7 @@ async function runGasComparison() {
       deployerAddress
     );
 
-    const blendedSwap2Tx = await blendedAMM.swapEnhanced(
+    const blendedSwap2Tx = await blendedAMM.swap(
       CONFIG.addresses.tokenB,
       CONFIG.SWAP_AMOUNT,
       0,
@@ -239,7 +239,7 @@ async function runGasComparison() {
       deployerAddress
     );
 
-    const blendedLiquidityTx = await blendedAMM.addLiquidityEnhanced(
+    const blendedLiquidityTx = await blendedAMM.addLiquidity(
       liquidityAmount,
       liquidityAmount,
       0,

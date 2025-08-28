@@ -114,7 +114,7 @@ contract Bootstrap is Script {
         
         // Add liquidity to Blended AMM
         console.log("Adding liquidity to Blended AMM...");
-        uint256 blendedLiquidity = blendedAmm.addLiquidityEnhanced(
+        uint256 blendedLiquidity = blendedAmm.addLiquidity(
             INITIAL_LIQUIDITY,
             INITIAL_LIQUIDITY,
             0,
