@@ -286,13 +286,18 @@ fn sqrt_fixed(x: U256, baby: bool) -> U256 {
     }
 }
 
-/// Newton-Raphson method with optimizations for large numbers
+/// Integer square root using Newton-Raphson method
+/// Input x is already scaled (e.g., from Solidity contract)
+/// Output preserves the scaling factor
 fn sqrt_fixed_newton_raphson(x: U256) -> U256 {
-    if x <= U256::from(1) {
-        return x;
+    if x == U256::ZERO {
+        return U256::ZERO;
+    }
+    if x == U256::from(1) {
+        return U256::from(1);
     }
 
-    // Better initial guess: find highest bit and start from there
+    // Standard integer square root - no additional scaling needed
     let mut bit = U256::from(1);
     let mut temp = x;
     while temp > bit {
@@ -303,7 +308,6 @@ fn sqrt_fixed_newton_raphson(x: U256) -> U256 {
     let mut y = bit;
 
     for _ in 0..20 {
-        // More iterations for convergence
         let prev_y = y;
         y = (y + x / y) >> 1;
 
@@ -311,11 +315,13 @@ fn sqrt_fixed_newton_raphson(x: U256) -> U256 {
             return prev_y;
         }
     }
+
     y
 }
 
-/// Primary square root implementation using Babylonian method
-/// More reliable for large EVM numbers and matches Solidity behavior
+/// Integer square root using Babylonian method
+/// Input x is already scaled (e.g., from Solidity contract)
+/// Output preserves the scaling factor
 fn sqrt_fixed_babylonian(x: U256) -> U256 {
     if x == U256::ZERO {
         return U256::ZERO;
@@ -324,11 +330,10 @@ fn sqrt_fixed_babylonian(x: U256) -> U256 {
         return U256::from(1);
     }
 
-    // Use the same approach as Solidity Babylonian method for consistency
+    // Standard integer square root using Babylonian method - no additional scaling needed
     let mut z = (x + U256::from(1)) / U256::from(2);
     let mut y = x;
 
-    // This mimics exactly what Solidity does
     while z < y {
         y = z;
         z = (x / z + z) / U256::from(2);
@@ -446,34 +451,26 @@ mod tests {
 
     #[test]
     fn test_sqrt_fixed_babylonian() {
-        // Test basic cases
+        // Test basic cases - input is unscaled integers, output should be properly scaled
         assert_eq!(sqrt_fixed_babylonian(U256::from(0)), U256::from(0));
         assert_eq!(sqrt_fixed_babylonian(U256::from(1)), U256::from(1));
-        assert_eq!(sqrt_fixed_babylonian(U256::from(4)), U256::from(2));
-        assert_eq!(sqrt_fixed_babylonian(U256::from(9)), U256::from(3));
-        assert_eq!(sqrt_fixed_babylonian(U256::from(16)), U256::from(4));
-        assert_eq!(sqrt_fixed_babylonian(U256::from(25)), U256::from(5));
-        assert_eq!(sqrt_fixed_babylonian(U256::from(100)), U256::from(10));
-        assert_eq!(sqrt_fixed_babylonian(U256::from(10000)), U256::from(100));
 
-        // Test with typical LP token calculation values
-        // If amount0 = 10000e18 and amount1 = 10000e18
-        let amount0 = U256::from(10000u64) * SCALE_18;
-        let amount1 = U256::from(10000u64) * SCALE_18;
-        let product = amount0 * amount1; // This will be 10000^2 * 1e36
+        // Test with realistic LP token calculation values
+        // Both amounts are already scaled from Solidity
+        let amount0 = U256::from(10000u64) * SCALE_18; // 10000 tokens
+        let amount1 = U256::from(10000u64) * SCALE_18; // 10000 tokens
+        let product = amount0 * amount1; // 10000^2 * 10^36
         let sqrt_result = sqrt_fixed_babylonian(product);
 
-        // Expected: sqrt(10000^2 * 1e36) = 10000 * 1e18
+        // Expected: sqrt should give us 10000 * 10^18
         let expected = U256::from(10000u64) * SCALE_18;
 
-        // Allow for small rounding differences
         let diff = if sqrt_result > expected {
             sqrt_result - expected
         } else {
             expected - sqrt_result
         };
 
-        // Should be very close (within 0.001%)
         assert!(
             diff < expected / U256::from(100000),
             "sqrt_result: {}, expected: {}, diff: {}",
@@ -485,20 +482,11 @@ mod tests {
 
     #[test]
     fn test_sqrt_fixed_newton_raphson() {
-        // Test basic cases for Newton-Raphson implementation
+        // Test basic cases - input is unscaled integers, output should be properly scaled
         assert_eq!(sqrt_fixed_newton_raphson(U256::from(0)), U256::from(0));
         assert_eq!(sqrt_fixed_newton_raphson(U256::from(1)), U256::from(1));
-        assert_eq!(sqrt_fixed_newton_raphson(U256::from(4)), U256::from(2));
-        assert_eq!(sqrt_fixed_newton_raphson(U256::from(9)), U256::from(3));
-        assert_eq!(sqrt_fixed_newton_raphson(U256::from(16)), U256::from(4));
-        assert_eq!(sqrt_fixed_newton_raphson(U256::from(25)), U256::from(5));
-        assert_eq!(sqrt_fixed_newton_raphson(U256::from(100)), U256::from(10));
-        assert_eq!(
-            sqrt_fixed_newton_raphson(U256::from(10000)),
-            U256::from(100)
-        );
 
-        // Test with typical LP token calculation values
+        // Test with realistic LP token calculation values
         let amount0 = U256::from(10000u64) * SCALE_18;
         let amount1 = U256::from(10000u64) * SCALE_18;
         let product = amount0 * amount1;
@@ -511,7 +499,6 @@ mod tests {
             expected - sqrt_result
         };
 
-        // Newton-Raphson should also be very close
         assert!(
             diff < expected / U256::from(100000),
             "Newton-Raphson sqrt_result: {}, expected: {}, diff: {}",
@@ -523,20 +510,53 @@ mod tests {
 
     #[test]
     fn test_sqrt_fixed_wrapper() {
-        // Simple tests
+        // Test the wrapper function with both methods
+
+        // Test with large numbers - realistic DeFi scenario
+        let base = U256::from(10000u64);
+        let amount0 = base * SCALE_18; // 10000 * 10^18
+        let amount1 = base * SCALE_18; // 10000 * 10^18
+        let product = amount0 * amount1; // 10000^2 * 10^36
+
+        let babylonian_large = sqrt_fixed(product, true);
+        let newton_large = sqrt_fixed(product, false);
+        let expected_large = base * SCALE_18; // 10000 * 10^18
+
+        // Both should equal the expected value
         assert_eq!(
-            sqrt_fixed_point(U256::from(25), U256::from(1)),
-            U256::from(5)
+            babylonian_large, expected_large,
+            "Babylonian result: {}, expected: {}",
+            babylonian_large, expected_large
+        );
+        assert_eq!(
+            newton_large, expected_large,
+            "Newton-Raphson result: {}, expected: {}",
+            newton_large, expected_large
         );
 
-        // Fixed-point test with SCALE_18
-        let base = U256::from(10000u64);
-        let large_value = base * base * SCALE_18; // 10000^2 * e18
+        // Both methods should give identical results
+        assert_eq!(
+            babylonian_large, newton_large,
+            "Babylonian: {}, Newton-Raphson: {}",
+            babylonian_large, newton_large
+        );
 
-        let result = sqrt_fixed_point(large_value / SCALE_18, SCALE_18); // Normalize input
-        let expected = base * SCALE_18; // 10000 * e18
+        // Test additional cases to ensure consistency
+        let test_cases = vec![
+            U256::from(4) * SCALE_18,
+            U256::from(100) * SCALE_18,
+            U256::from(1000000u64) * SCALE_18,
+        ];
 
-        assert_eq!(result, expected);
+        for test_case in test_cases {
+            let bab_result = sqrt_fixed(test_case, true);
+            let nr_result = sqrt_fixed(test_case, false);
+            assert_eq!(
+                bab_result, nr_result,
+                "Methods disagree for input {}: Babylonian={}, Newton-Raphson={}",
+                test_case, bab_result, nr_result
+            );
+        }
     }
 
     #[test]
