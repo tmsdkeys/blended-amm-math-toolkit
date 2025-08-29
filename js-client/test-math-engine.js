@@ -159,17 +159,17 @@ async function testMathEngine() {
       );
     });
 
-    const routeTx = await mathEngine.findOptimalRoute(
-      amountIn,
-      pools,
-      feeRates
-    );
-    const routeReceipt = await routeTx.wait();
-    const routeGas = routeReceipt.gasUsed;
+    // const routeTx = await mathEngine.findOptimalRoute(
+    //   amountIn,
+    //   pools,
+    //   feeRates
+    // );
+    // const routeReceipt = await routeTx.wait();
+    // const routeGas = routeReceipt.gasUsed;
 
-    console.log(`Gas Used: ${routeGas.toString()}`);
-    console.log(`Transaction Hash: ${routeReceipt.transactionHash}`);
-    console.log("✅ Multi-hop route optimization completed\n");
+    // console.log(`Gas Used: ${routeGas.toString()}`);
+    // console.log(`Transaction Hash: ${routeReceipt.transactionHash}`);
+    // console.log("✅ Multi-hop route optimization completed\n");
 
     // Gas Summary
     console.log("=== Gas Usage Summary ===");

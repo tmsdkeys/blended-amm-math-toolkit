@@ -12,20 +12,20 @@ const CONFIG = {
 
   // Load from deployments/testnet.json
   addresses: {
-    tokenA: "0xcB340aB3c8e00886C5DBF09328D50af6D40B9EEb",
-    tokenB: "0x8108c36844Faf04C091973E95aE2B725cdCb55cC",
-    mathEngine: "0x43aD2ef2fA35F2DE88E0E137429b8f6F4AeD65a2",
-    basicAMM: "0x1f9483387E54577aAD7E8145E99d38D4722eaCFD",
-    enhancedAMM: "0x3Ac977b824042344324C16bc0EA4B02396d94417",
+    tokenA: "0xa37f1A5eedfb1D4e81AbE78c4B4b28c91744D1ab",
+    tokenB: "0x3785F7f6046f4401b6a7cC94397ecb42A26C7fD5",
+    mathEngine: "0x60c026DEF86C3D0c7d47D260dB3010775d26a535",
+    basicAMM: "0x35F8e9415caBb09F4FE9Fbb4d1955D1F076292c0",
+    blendedAMM: "0x822cC306D92026cA0248941Cf7De7813faA27146",
   },
 
   // Test amounts
-  INITIAL_LIQUIDITY: ethers.utils.parseEther("1000"), // 1k tokens (reduced from 10k)
+  INITIAL_LIQUIDITY: ethers.utils.parseEther("10000"), // 1k tokens (reduced from 10k)
   SWAP_AMOUNT: ethers.utils.parseEther("100"), // 100 tokens
   TEST_TOKENS_PER_USER: ethers.utils.parseEther("5000"), // 5k tokens per user
 
   // Your private key (set this as environment variable)
-  privateKey: "",
+  privateKey: process.env.PRIVATE_KEY,
 };
 
 // Helper function to load ABI from build artifacts
@@ -57,7 +57,7 @@ const wallet = new ethers.Wallet(CONFIG.privateKey, provider);
 // Load ABIs from build artifacts
 const ERC20_ABI = loadABI("ERC20");
 const BASIC_AMM_ABI = loadABI("BasicAMM");
-const ENHANCED_AMM_ABI = loadABI("EnhancedAMM");
+const BLENDED_AMM_ABI = loadABI("BlendedAMM");
 
 // Load math engine ABI from root directory
 let MATH_ENGINE_ABI = [];
@@ -85,9 +85,9 @@ async function getGasUsed(tx) {
   return receipt.gasUsed;
 }
 
-function calculateGasSavings(basicGas, enhancedGas) {
+function calculateGasSavings(basicGas, blendedGas) {
   if (basicGas.eq(0)) return "N/A";
-  const diff = basicGas.sub(enhancedGas);
+  const diff = basicGas.sub(blendedGas);
   const percentSaved = diff.mul(100).div(basicGas);
   return {
     saved: diff,
@@ -101,7 +101,7 @@ module.exports = {
   wallet,
   ERC20_ABI,
   BASIC_AMM_ABI,
-  ENHANCED_AMM_ABI,
+  BLENDED_AMM_ABI,
   MATH_ENGINE_ABI,
   formatEther,
   parseEther,
