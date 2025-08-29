@@ -2,7 +2,7 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-fs_permissions = [{ access = "read-write", path = "./deployments/testnet.json" }]
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
 # Optimizer settings for accurate gas measurements
 optimizer = true
 optimizer_runs = 200
@@ -16,3 +16,13 @@ gas_snapshots = true
 # RPC endpoints
 [rpc_endpoints]
 fluent-testnet = "https://rpc.testnet.fluent.xyz"
+fluent-devnet = "https://rpc.devnet.fluent.xyz"
+
+# Network-specific profiles
+[profile.testnet]
+rpc_url = "https://rpc.testnet.fluent.xyz"
+deployment_file = "./deployments/testnet.json"
+
+[profile.devnet]
+rpc_url = "https://rpc.devnet.fluent.xyz"
+deployment_file = "./deployments/devnet.json"

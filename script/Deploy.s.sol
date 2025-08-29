@@ -14,13 +14,24 @@ contract Deploy is Script {
     address public basicAmm;
     address public blendedAmm;
 
+    // Network detection
+    string public deploymentFilePath;
+
     function run() external {
+        // Detect network based on chain ID
+        uint256 chainId = block.chainid;
+        deploymentFilePath = getDeploymentPath();
+
+        console.log("Detected chain ID:", chainId);
+        console.log("Deployment file:", deploymentFilePath);
+
+        console.log("=== Deploying to chain", chainId, "===");
+
         // Start broadcasting transactions
         vm.startBroadcast();
 
-        // Step 1: Deploy test tokens (or use existing ones)
-        tokenA = deployTokenA();
-        tokenB = deployTokenB();
+        // Step 1: Get or deploy test tokens
+        (tokenA, tokenB) = getOrDeployTokens();
 
         // Step 2: Deploy the Rust Mathematical Engine from WASM bytecode
         mathEngine = deployMathEngine();
@@ -38,12 +49,41 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
 
-        console.log("\n=== Deployment Complete ===");
+        console.log("\n=== Deployment Complete on chain", chainId, "===");
         console.log("Token A:", tokenA);
         console.log("Token B:", tokenB);
         console.log("Math Engine:", mathEngine);
         console.log("Basic AMM:", basicAmm);
         console.log("Blended AMM:", blendedAmm);
+        console.log("Deployment saved to:", deploymentFilePath);
+    }
+
+    function getOrDeployTokens() internal returns (address, address) {
+        address _tokenA = getOrDeployToken("tokenA");
+        address _tokenB = getOrDeployToken("tokenB");
+
+        if (_tokenA == address(0)) {
+            _tokenA = deployTokenA();
+        }
+        if (_tokenB == address(0)) {
+            _tokenB = deployTokenB();
+        }
+        return (_tokenA, _tokenB);
+    }
+
+    function getOrDeployToken(string memory tokenName) internal view returns (address) {
+        // Try to read existing token address from deployment file
+        try vm.readFile(deploymentFilePath) returns (string memory deploymentData) {
+            try vm.parseJsonAddress(deploymentData, string.concat(".", tokenName)) returns (address token) {
+                if (token != address(0)) {
+                    console.log("Using existing", tokenName, "at:", token);
+                    return token;
+                }
+            } catch {}
+        } catch {}
+
+        // Return zero address if no token found
+        return address(0);
     }
 
     function deployTokenA() internal returns (address) {
@@ -89,8 +129,21 @@ contract Deploy is Script {
         vm.serializeAddress(json, "basicAMM", basicAmm);
         string memory finalJson = vm.serializeAddress(json, "blendedAMM", blendedAmm);
 
-        vm.writeJson(finalJson, "./deployment.json");
-        console.log("Deployment addresses saved to deployment.json");
+        vm.writeJson(finalJson, deploymentFilePath);
+        console.log("Deployment addresses saved to", deploymentFilePath);
+    }
+
+    function getDeploymentPath() internal view returns (string memory) {
+        uint256 chainId = block.chainid;
+
+        if (chainId == 20994) {
+            // testnet chain id
+            return "./deployments/testnet.json";
+        } else if (chainId == 20993) {
+            // devnet chain id
+            return "./deployments/devnet.json";
+        }
+        revert("Unsupported chain");
     }
 }
 

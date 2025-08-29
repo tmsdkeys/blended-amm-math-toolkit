@@ -10,7 +10,7 @@ import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol"
 
 /**
  * @title BlendedAMM
- * @dev Blended execution constant product (x * y = k) AMM 
+ * @dev Blended execution constant product (x * y = k) AMM
  * that leverages Rust mathematical engine for high-precision calculations
  * and advanced features.
  */

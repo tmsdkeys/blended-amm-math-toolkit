@@ -61,11 +61,34 @@ make setup
 # Build all contracts (Rust + Solidity)
 make build
 
-# Deploy to Fluent testnet
-make deploy  # Uses RPC from foundry.toml
+# Deploy to Fluent testnet (default)
+make deploy
+
+# Deploy to Fluent devnet
+make deploy-devnet
+
+# Deploy to specific network using profile
+forge script script/Deploy.s.sol --profile testnet --broadcast
+forge script script/Deploy.s.sol --profile devnet --broadcast
 ```
 
 Note: You need to have a `$PRIVATE_KEY` environment variable set. (Use .env file for this).
+
+### Network Configuration
+
+The project automatically detects networks using chain IDs:
+
+- **Testnet**: Chain ID `20994` → `./deployments/testnet.json`
+- **Devnet**: Chain ID `20993` → `./deployments/devnet.json`
+
+The deployment scripts automatically detect which network they're running on and use the appropriate deployment file. Foundry profiles are used for RPC URLs and other configuration.
+
+### Smart Token Deployment
+
+The deployment script intelligently handles tokens:
+- **Use existing tokens** by adding their addresses to the deployment file
+- **Deploy new mock tokens** if no addresses are provided
+- **Mix and match** existing and new tokens as needed
 
 ### Run Benchmarks
 

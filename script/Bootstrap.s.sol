@@ -23,12 +23,22 @@ contract Bootstrap is Script {
     address public bob;
     address public charlie;
 
+    // Network detection
+    string public deploymentFilePath;
+
     // Initial amounts (adjust based on your token setup)
     uint256 constant INITIAL_LIQUIDITY = 10000 * 1e18;
     uint256 constant TEST_TOKENS_PER_USER = 5000 * 1e18;
 
     function run() external {
-        console.log("=== Bootstrapping Deployed Contracts ===");
+        // Detect network based on chain ID
+        uint256 chainId = block.chainid;
+        deploymentFilePath = getDeploymentPath();
+
+        console.log("Detected chain ID:", chainId);
+        console.log("Deployment file:", deploymentFilePath);
+
+        console.log("=== Bootstrapping Deployed Contracts on chain", chainId, "===");
 
         // Load deployment addresses
         loadDeployedContracts();
@@ -50,19 +60,19 @@ contract Bootstrap is Script {
         // Step 3: Verify setup
         verifySetup();
 
-        console.log("\n=== Bootstrap Complete ===");
+        console.log("\n=== Bootstrap Complete on chain", chainId, "===");
         console.log("Ready for gas benchmarking!");
     }
 
     function loadDeployedContracts() internal {
-        string memory deploymentData = vm.readFile("./deployments/testnet.json");
+        string memory deploymentData = vm.readFile(deploymentFilePath);
 
         tokenA = IERC20(vm.parseJsonAddress(deploymentData, ".tokenA"));
         tokenB = IERC20(vm.parseJsonAddress(deploymentData, ".tokenB"));
         basicAmm = BasicAMM(vm.parseJsonAddress(deploymentData, ".basicAMM"));
         blendedAmm = BlendedAMM(vm.parseJsonAddress(deploymentData, ".blendedAMM"));
 
-        console.log("Loaded contracts:");
+        console.log("Loaded contracts from", deploymentFilePath);
         console.log("  Token A:", address(tokenA));
         console.log("  Token B:", address(tokenB));
         console.log("  Basic AMM:", address(basicAmm));
@@ -94,13 +104,27 @@ contract Bootstrap is Script {
         require(balanceA >= INITIAL_LIQUIDITY * 2, "Insufficient Token A for bootstrap");
         require(balanceB >= INITIAL_LIQUIDITY * 2, "Insufficient Token B for bootstrap");
 
-        // Approve AMMs
-        tokenA.approve(address(basicAmm), INITIAL_LIQUIDITY);
-        tokenB.approve(address(basicAmm), INITIAL_LIQUIDITY);
-        tokenA.approve(address(blendedAmm), INITIAL_LIQUIDITY);
-        tokenB.approve(address(blendedAmm), INITIAL_LIQUIDITY);
+        // Approve AMMs for maximum token expenditures
+        console.log("Approving AMM contracts for token expenditures...");
 
-        // Add liquidity to Basic AMM
+        // Approve Basic AMM
+        tokenA.approve(address(basicAmm), type(uint256).max);
+        tokenB.approve(address(basicAmm), type(uint256).max);
+        console.log("  Approved Basic AMM for max Token A & B");
+
+        // Approve Blended AMM
+        tokenA.approve(address(blendedAmm), type(uint256).max);
+        tokenB.approve(address(blendedAmm), type(uint256).max);
+        console.log("  Approved Blended AMM for max Token A & B");
+
+        // Verify approvals
+        console.log("  Basic AMM Token A allowance:", tokenA.allowance(msg.sender, address(basicAmm)) / 1e18);
+        console.log("  Basic AMM Token B allowance:", tokenB.allowance(msg.sender, address(basicAmm)) / 1e18);
+        console.log("  Blended AMM Token A allowance:", tokenA.allowance(msg.sender, address(blendedAmm)) / 1e18);
+        console.log("  Blended AMM Token B allowance:", tokenB.allowance(msg.sender, address(blendedAmm)) / 1e18);
+
+        // Check if we need to reset approvals (some tokens require this)
+        checkAndResetApprovals();
         console.log("Adding liquidity to Basic AMM...");
         uint256 basicLiquidity = basicAmm.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, msg.sender);
         console.log("  LP tokens received:", basicLiquidity / 1e18);
@@ -157,5 +181,55 @@ contract Bootstrap is Script {
         console.log("Charlie:");
         console.log("  Token A:", tokenA.balanceOf(charlie) / 1e18);
         console.log("  Token B:", tokenB.balanceOf(charlie) / 1e18);
+
+        // Verify AMM approvals
+        console.log("\nAMM Approvals:");
+        console.log("Basic AMM Token A allowance:", tokenA.allowance(msg.sender, address(basicAmm)) / 1e18);
+        console.log("Basic AMM Token B allowance:", tokenB.allowance(msg.sender, address(basicAmm)) / 1e18);
+        console.log("Blended AMM Token A allowance:", tokenA.allowance(msg.sender, address(blendedAmm)) / 1e18);
+        console.log("Blended AMM Token B allowance:", tokenB.allowance(msg.sender, address(blendedAmm)) / 1e18);
+    }
+
+    function getDeploymentPath() internal view returns (string memory) {
+        uint256 chainId = block.chainid;
+
+        if (chainId == 20994) {
+            // testnet chain id
+            return "./deployments/testnet.json";
+        } else if (chainId == 20993) {
+            // devnet chain id
+            return "./deployments/devnet.json";
+        }
+        revert("Unsupported chain");
+    }
+
+    function checkAndResetApprovals() internal {
+        // Some tokens require resetting approvals to 0 before setting new ones
+        // Check if current allowances are sufficient, if not, reset and re-approve
+        uint256 basicAllowanceA = tokenA.allowance(msg.sender, address(basicAmm));
+        uint256 basicAllowanceB = tokenB.allowance(msg.sender, address(basicAmm));
+        uint256 blendedAllowanceA = tokenA.allowance(msg.sender, address(blendedAmm));
+        uint256 blendedAllowanceB = tokenB.allowance(msg.sender, address(blendedAmm));
+
+        if (
+            basicAllowanceA < INITIAL_LIQUIDITY || basicAllowanceB < INITIAL_LIQUIDITY
+                || blendedAllowanceA < INITIAL_LIQUIDITY || blendedAllowanceB < INITIAL_LIQUIDITY
+        ) {
+            console.log("  Resetting approvals and re-approving...");
+
+            // Reset to 0 first (some tokens require this)
+            tokenA.approve(address(basicAmm), 0);
+            tokenB.approve(address(basicAmm), 0);
+            tokenA.approve(address(blendedAmm), 0);
+            tokenB.approve(address(blendedAmm), 0);
+
+            // Re-approve for max
+            tokenA.approve(address(basicAmm), type(uint256).max);
+            tokenB.approve(address(basicAmm), type(uint256).max);
+            tokenA.approve(address(blendedAmm), type(uint256).max);
+            tokenB.approve(address(blendedAmm), type(uint256).max);
+
+            console.log("  Re-approved all AMMs for max tokens");
+        }
     }
 }
