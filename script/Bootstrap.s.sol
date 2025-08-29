@@ -23,7 +23,7 @@ contract Bootstrap is Script {
     address public bob;
     address public charlie;
 
-    // Network detection
+    // Deployment configuration
     string public deploymentFilePath;
 
     // Initial amounts (adjust based on your token setup)
@@ -31,14 +31,11 @@ contract Bootstrap is Script {
     uint256 constant TEST_TOKENS_PER_USER = 5000 * 1e18;
 
     function run() external {
-        // Detect network based on chain ID
-        uint256 chainId = block.chainid;
-        deploymentFilePath = getDeploymentPath();
-
-        console.log("Detected chain ID:", chainId);
+        // Get deployment path from environment variable
+        deploymentFilePath = vm.envString("DEPLOYMENT_PATH");
         console.log("Deployment file:", deploymentFilePath);
 
-        console.log("=== Bootstrapping Deployed Contracts on chain", chainId, "===");
+        console.log("=== Bootstrapping Deployed Contracts ===");
 
         // Load deployment addresses
         loadDeployedContracts();
@@ -60,7 +57,7 @@ contract Bootstrap is Script {
         // Step 3: Verify setup
         verifySetup();
 
-        console.log("\n=== Bootstrap Complete on chain", chainId, "===");
+        console.log("\n=== Bootstrap Complete ===");
         console.log("Ready for gas benchmarking!");
     }
 
@@ -188,19 +185,6 @@ contract Bootstrap is Script {
         console.log("Basic AMM Token B allowance:", tokenB.allowance(msg.sender, address(basicAmm)) / 1e18);
         console.log("Blended AMM Token A allowance:", tokenA.allowance(msg.sender, address(blendedAmm)) / 1e18);
         console.log("Blended AMM Token B allowance:", tokenB.allowance(msg.sender, address(blendedAmm)) / 1e18);
-    }
-
-    function getDeploymentPath() internal view returns (string memory) {
-        uint256 chainId = block.chainid;
-
-        if (chainId == 20994) {
-            // testnet chain id
-            return "./deployments/testnet.json";
-        } else if (chainId == 20993) {
-            // devnet chain id
-            return "./deployments/devnet.json";
-        }
-        revert("Unsupported chain");
     }
 
     function checkAndResetApprovals() internal {

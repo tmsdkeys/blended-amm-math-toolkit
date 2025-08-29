@@ -76,12 +76,12 @@ Note: You need to have a `$PRIVATE_KEY` environment variable set. (Use .env file
 
 ### Network Configuration
 
-The project automatically detects networks using chain IDs:
+The project uses environment variables for network configuration:
 
-- **Testnet**: Chain ID `20994` → `./deployments/testnet.json`
-- **Devnet**: Chain ID `20993` → `./deployments/devnet.json`
+- **Testnet**: Set `DEPLOYMENT_PATH=./deployments/testnet.json`
+- **Devnet**: Set `DEPLOYMENT_PATH=./deployments/devnet.json`
 
-The deployment scripts automatically detect which network they're running on and use the appropriate deployment file. Foundry profiles are used for RPC URLs and other configuration.
+The deployment scripts read the deployment path from the `DEPLOYMENT_PATH` environment variable.
 
 ### Smart Token Deployment
 

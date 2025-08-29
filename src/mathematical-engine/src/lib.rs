@@ -2,7 +2,6 @@
 extern crate alloc;
 extern crate fluentbase_sdk;
 
-use alloc::vec::Vec;
 use fluentbase_sdk::{
     basic_entrypoint,
     codec::Codec,
@@ -13,7 +12,7 @@ use fluentbase_sdk::{
 // ============ Custom Type Definitions Using Codec ============
 
 /// Parameters for slippage calculation
-#[derive(Codec, Debug, Default, Clone, PartialEq)]
+#[derive(Codec, Default, Debug, Clone, PartialEq)]
 pub struct SlippageParams {
     pub amount_in: U256,
     pub reserve_in: U256,
@@ -22,7 +21,7 @@ pub struct SlippageParams {
 }
 
 /// Parameters for dynamic fee calculation
-#[derive(Codec, Debug, Default, Clone, PartialEq)]
+#[derive(Codec, Default, Debug, Clone, PartialEq)]
 pub struct DynamicFeeParams {
     pub volatility: U256,      // in basis points
     pub volume_24h: U256,      // in wei
@@ -30,7 +29,7 @@ pub struct DynamicFeeParams {
 }
 
 /// Result from optimization calculations
-#[derive(Codec, Debug, Default, Clone, PartialEq)]
+#[derive(Codec, Default, Debug, Clone, PartialEq)]
 pub struct OptimizationResult {
     pub optimal_amount: U256,
     pub expected_output: U256,
@@ -38,7 +37,7 @@ pub struct OptimizationResult {
 }
 
 /// Pool information for routing
-#[derive(Codec, Debug, Default, Clone, PartialEq)]
+#[derive(Codec, Default, Debug, Clone, PartialEq)]
 pub struct Pool {
     pub reserve_in: U256,
     pub reserve_out: U256,
@@ -52,7 +51,6 @@ const SCALE_6: U256 = U256::from_limbs([1_000_000, 0, 0, 0]); // 1e6
 const BASIS_POINTS: U256 = U256::from_limbs([10_000, 0, 0, 0]); // 10000
 
 // Mathematical constants scaled to 1e18
-const E_SCALED: U256 = U256::from_limbs([2_718_281_828_459_045_235, 0, 0, 0]); // e * 1e18
 const LN2_SCALED: U256 = U256::from_limbs([693_147_180_559_945_309, 0, 0, 0]); // ln(2) * 1e18
 
 // Maximum iterations for convergence algorithms
@@ -84,7 +82,6 @@ pub trait MathematicalEngineAPI {
         current_price: U256,
         baby: bool,
     ) -> U256;
-    fn find_optimal_route(&self, amount_in: U256, pools: Vec<Pool>, fee_rates: Vec<U256>) -> U256;
 }
 
 #[router(mode = "solidity")]
@@ -93,7 +90,11 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
     /// More efficient than Solidity's iterative Babylonian method
     #[function_id("calculatePreciseSquareRoot(uint256,bool)")]
     fn calculate_precise_square_root(&self, value: U256, baby: bool) -> U256 {
-        sqrt_fixed(value, baby) // Use Babylonian method for reliability
+        if baby {
+            sqrt_fixed_babylonian(value)
+        } else {
+            sqrt_fixed_newton_raphson(value)
+        }
     }
 
     /// Calculate slippage with high-precision fixed-point arithmetic
@@ -174,7 +175,7 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
 
         // Calculate using fixed-point square root
         let inner = mul_div(k, total_amount * fee_multiplier, BASIS_POINTS);
-        let optimal_ratio = sqrt_fixed(inner, true); // Use Babylonian method for reliability
+        let optimal_ratio = sqrt_fixed_babylonian(inner); // Use Babylonian method for reliability
         let optimal_amount = optimal_ratio.min(total_amount);
 
         // Calculate expected output with high precision
@@ -211,7 +212,11 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
         // Geometric mean: sqrt(amount0 * amount1)
         // Using high-precision fixed-point sqrt
         let product = amount0 * amount1;
-        sqrt_fixed(product, baby) // Use Babylonian method for reliability
+        if baby {
+            sqrt_fixed_babylonian(product)
+        } else {
+            sqrt_fixed_newton_raphson(product)
+        }
     }
 
     /// Calculate impermanent loss with high precision
@@ -234,7 +239,11 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
         let price_ratio = mul_div(current_price, SCALE_18, initial_price);
 
         // Calculate sqrt of ratio
-        let sqrt_ratio = sqrt_fixed(price_ratio, baby); // Use Babylonian method for reliability
+        let sqrt_ratio = if baby {
+            sqrt_fixed_babylonian(price_ratio)
+        } else {
+            sqrt_fixed_newton_raphson(price_ratio)
+        };
 
         // Calculate IL: 2 * sqrt_ratio / (1 + price_ratio) - 1
         let numerator = U256::from(2) * sqrt_ratio;
@@ -249,52 +258,9 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
             U256::ZERO
         }
     }
-
-    /// Multi-hop routing optimization with fixed-point precision
-    /// Finds the best output through multiple pools
-    #[function_id("findOptimalRoute(uint256,(uint256,uint256)[],uint256[])")]
-    fn find_optimal_route(&self, amount_in: U256, pools: Vec<Pool>, fee_rates: Vec<U256>) -> U256 {
-        if pools.is_empty() || pools.len() != fee_rates.len() {
-            return U256::ZERO;
-        }
-
-        let mut current_amount = amount_in;
-
-        // Calculate output through each pool in sequence
-        for i in 0..pools.len() {
-            let pool = &pools[i];
-            let fee_rate = fee_rates[i];
-
-            let fee_multiplier = BASIS_POINTS - fee_rate;
-            let amount_in_with_fee = current_amount * fee_multiplier;
-
-            // High-precision calculation using mul_div
-            let numerator = amount_in_with_fee * pool.reserve_out;
-            let denominator = pool.reserve_in * BASIS_POINTS + amount_in_with_fee;
-
-            current_amount = mul_div(numerator, U256::from(1), denominator);
-
-            if current_amount == U256::ZERO {
-                break;
-            }
-        }
-
-        current_amount
-    }
 }
 
 // ============ Fixed-Point Mathematical Functions ============
-
-/// Wrapper function that chooses between Babylonian and Newton-Raphson methods
-/// baby: true = Babylonian method (more reliable for large numbers)
-/// baby: false = Newton-Raphson method (higher precision)
-fn sqrt_fixed(x: U256, baby: bool) -> U256 {
-    if baby {
-        sqrt_fixed_babylonian(x)
-    } else {
-        sqrt_fixed_newton_raphson(x)
-    }
-}
 
 /// Integer square root using Newton-Raphson method
 /// Input x is already scaled (e.g., from Solidity contract)
@@ -317,7 +283,7 @@ fn sqrt_fixed_newton_raphson(x: U256) -> U256 {
 
     let mut y = bit;
 
-    for _ in 0..20 {
+    for _ in 0..MAX_ITERATIONS {
         let prev_y = y;
         y = (y + x / y) >> 1;
 
@@ -516,57 +482,6 @@ mod tests {
             expected,
             diff
         );
-    }
-
-    #[test]
-    fn test_sqrt_fixed_wrapper() {
-        // Test the wrapper function with both methods
-
-        // Test with large numbers - realistic DeFi scenario
-        let base = U256::from(10000u64);
-        let amount0 = base * SCALE_18; // 10000 * 10^18
-        let amount1 = base * SCALE_18; // 10000 * 10^18
-        let product = amount0 * amount1; // 10000^2 * 10^36
-
-        let babylonian_large = sqrt_fixed(product, true);
-        let newton_large = sqrt_fixed(product, false);
-        let expected_large = base * SCALE_18; // 10000 * 10^18
-
-        // Both should equal the expected value
-        assert_eq!(
-            babylonian_large, expected_large,
-            "Babylonian result: {}, expected: {}",
-            babylonian_large, expected_large
-        );
-        assert_eq!(
-            newton_large, expected_large,
-            "Newton-Raphson result: {}, expected: {}",
-            newton_large, expected_large
-        );
-
-        // Both methods should give identical results
-        assert_eq!(
-            babylonian_large, newton_large,
-            "Babylonian: {}, Newton-Raphson: {}",
-            babylonian_large, newton_large
-        );
-
-        // Test additional cases to ensure consistency
-        let test_cases = vec![
-            U256::from(4) * SCALE_18,
-            U256::from(100) * SCALE_18,
-            U256::from(1000000u64) * SCALE_18,
-        ];
-
-        for test_case in test_cases {
-            let bab_result = sqrt_fixed(test_case, true);
-            let nr_result = sqrt_fixed(test_case, false);
-            assert_eq!(
-                bab_result, nr_result,
-                "Methods disagree for input {}: Babylonian={}, Newton-Raphson={}",
-                test_case, bab_result, nr_result
-            );
-        }
     }
 
     #[test]

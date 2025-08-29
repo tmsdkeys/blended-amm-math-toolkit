@@ -18,11 +18,3 @@ gas_snapshots = true
 fluent-testnet = "https://rpc.testnet.fluent.xyz"
 fluent-devnet = "https://rpc.devnet.fluent.xyz"
 
-# Network-specific profiles
-[profile.testnet]
-rpc_url = "https://rpc.testnet.fluent.xyz"
-deployment_file = "./deployments/testnet.json"
-
-[profile.devnet]
-rpc_url = "https://rpc.devnet.fluent.xyz"
-deployment_file = "./deployments/devnet.json"

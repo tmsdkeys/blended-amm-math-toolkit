@@ -8,14 +8,19 @@ gblend verify-contract $ENHANCED_AMM src/BlendedAMM.sol:BlendedAMM \
     --verifier-url https://testnet.fluentscan.xyz/api/ \
     --constructor-args $(cast abi-encode "constructor(address,address,address,string,string)" $TOKEN_A $TOKEN_B $MATH_ENGINE "BlendedAMM-LPToken" "BAMM-LP")
 
+gblend script script/DeployAMMs.s.sol:DeployAMMs \
+    --rpc-url $RPC_URL \
+    --private-key $PRIVATE_KEY \
+    --broadcast
+    
 gblend script script/Bootstrap.s.sol:Bootstrap \
-    --rpc-url fluent-testnet \
+    --rpc-url $RPC_URL \
     --private-key $PRIVATE_KEY \
     --broadcast \
     -vvv
 
 gblend create MathematicalEngine.wasm \
-    --rpc-url https://rpc.testnet.fluent.xyz \
+    --rpc-url $RPC_URL \
     --private-key $PRIVATE_KEY \
     --broadcast \
     --verify \
