@@ -20,23 +20,23 @@ echo ""
 
 # Run all benchmark tests
 echo "1️⃣  Testing Swap Operations..."
-forge test --match-test testSwapBenchmark -vv
+gblend test --match-test testSwapBenchmark -vvv --rpc-url $RPC_URL
 
 echo ""
 echo "2️⃣  Testing Add Liquidity Operations..."
-forge test --match-test testAddLiquidityBenchmark -vv
+gblend test --match-test testAddLiquidityBenchmark -vvv --rpc-url $RPC_URL
 
 echo ""
 echo "3️⃣  Testing Remove Liquidity Operations..."
-forge test --match-test testRemoveLiquidityBenchmark -vv
+gblend test --match-test testRemoveLiquidityBenchmark -vvv --rpc-url $RPC_URL
 
 echo ""
 echo "4️⃣  Testing Calculation Accuracy..."
-forge test --match-test testCalculationAccuracy -vv
+gblend test --match-test testCalculationAccuracy -vvv --rpc-url $RPC_URL
 
 echo ""
 echo "5️⃣  Generating Comprehensive Report..."
-forge test --match-test testGenerateComprehensiveReport -vv
+gblend test --match-test testGenerateComprehensiveReport -vvv --rpc-url $RPC_URL
 
 echo ""
 echo "✅ All benchmark tests completed!"

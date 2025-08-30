@@ -28,9 +28,7 @@ contract Benchmark is Test {
     IERC20 public tokenB;
 
     // ============ Test Accounts ============
-    address public alice;  // Primary liquidity provider
-    address public bob;    // Swapper and liquidity provider
-    address public charlie; // Additional tester
+    address public deployer; // Deployer account for all operations
 
     // ============ Test Configuration ============
     uint256 constant ITERATIONS = 5;           // Number of iterations for averaging
@@ -80,50 +78,45 @@ contract Benchmark is Test {
         console2.log("  Basic AMM:", address(basicAmm));
         console2.log("  Blended AMM:", address(blendedAmm));
 
-        // Setup deterministic test accounts
-        alice = vm.addr(1);
-        bob = vm.addr(2);
-        charlie = vm.addr(3);
-
-        // Fund accounts with ETH for gas
-        vm.deal(alice, 100 ether);
-        vm.deal(bob, 100 ether);
-        vm.deal(charlie, 100 ether);
-
-        console2.log("Test accounts ready:");
-        console2.log("  Alice:", alice);
-        console2.log("  Bob:", bob);
-        console2.log("  Charlie:", charlie);
+        // Load deployer address from private key environment variable
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        deployer = vm.addr(deployerPrivateKey);
+        
+        console2.log("Deployer address:", deployer);
+        console2.log("Deployer ETH balance:", deployer.balance / 1e18);
+        console2.log("Using deployer account for all test operations");
 
         // Verify bootstrap was run
-        _verifyBootstrapSetup();
+        // _verifyBootstrapSetup();
     }
 
     // ============ Bootstrap Verification ============
     function _verifyBootstrapSetup() internal view {
-        uint256 aliceBalanceA = tokenA.balanceOf(alice);
-        uint256 aliceBalanceB = tokenB.balanceOf(alice);
-        uint256 bobBalanceA = tokenA.balanceOf(bob);
-        uint256 bobBalanceB = tokenB.balanceOf(bob);
+        uint256 deployerBalanceA = tokenA.balanceOf(deployer);
+        uint256 deployerBalanceB = tokenB.balanceOf(deployer);
 
-        require(aliceBalanceA >= LIQUIDITY_AMOUNT * 2, "Alice needs more Token A - run bootstrap first");
-        require(aliceBalanceB >= LIQUIDITY_AMOUNT * 2, "Alice needs more Token B - run bootstrap first");
-        require(bobBalanceA >= SWAP_AMOUNT * 2, "Bob needs more Token A - run bootstrap first");
-        require(bobBalanceB >= SWAP_AMOUNT * 2, "Bob needs more Token B - run bootstrap first");
+        console2.log("Deployer balance:", deployerBalanceA / 1e18);
+        console2.log("Deployer balance:", deployerBalanceB / 1e18);
+
+        require(deployerBalanceA >= LIQUIDITY_AMOUNT * 2, "Deployer needs more Token A - run bootstrap first");
+        require(deployerBalanceB >= LIQUIDITY_AMOUNT * 2, "Deployer needs more Token B - run bootstrap first");
 
         console2.log("Bootstrap verification passed:");
-        console2.log("  Alice Token A:", aliceBalanceA / 1e18);
-        console2.log("  Alice Token B:", aliceBalanceB / 1e18);
-        console2.log("  Bob Token A:", bobBalanceA / 1e18);
-        console2.log("  Bob Token B:", bobBalanceB / 1e18);
+        console2.log("  Deployer Token A:", deployerBalanceA / 1e18);
+        console2.log("  Deployer Token B:", deployerBalanceB / 1e18);
     }
 
     // ============ Swap Benchmarking ============
     function testSwapBenchmark() public {
         console2.log("\n=== SWAP OPERATION BENCHMARK ===");
         
-        // Ensure both AMMs have liquidity
-        _ensureLiquidityInBothAMMs();
+        // Transfer tokens needed for this specific test
+        _transferTokensForTest(SWAP_AMOUNT * ITERATIONS * 2, 0);
+        
+        // Reset any existing state and ensure both AMMs have liquidity
+        _resetLiquidityState();
+        _transferTokensForTest(LIQUIDITY_AMOUNT * 2, LIQUIDITY_AMOUNT * 2);
+        _addLiquidityToBothAMMs();
         
         // Approve tokens for swapping
         _approveTokensForSwapping();
@@ -146,15 +139,13 @@ contract Benchmark is Test {
             
             // Test Basic AMM swap
             uint256 gasStart = gasleft();
-            vm.prank(bob);
-            basicAmm.swap(address(tokenA), SWAP_AMOUNT, 0, bob);
+            basicAmm.swap(address(tokenA), SWAP_AMOUNT, 0, deployer);
             uint256 basicGas = gasStart - gasleft();
             totalBasicGas += basicGas;
             
             // Test Blended AMM swap
             gasStart = gasleft();
-            vm.prank(bob);
-            blendedAmm.swap(address(tokenA), SWAP_AMOUNT, 0, bob);
+            blendedAmm.swap(address(tokenA), SWAP_AMOUNT, 0, deployer);
             uint256 blendedGas = gasStart - gasleft();
             totalBlendedGas += blendedGas;
             
@@ -170,6 +161,9 @@ contract Benchmark is Test {
     // ============ Add Liquidity Benchmarking ============
     function testAddLiquidityBenchmark() public {
         console2.log("\n=== ADD LIQUIDITY BENCHMARK ===");
+        
+        // Transfer tokens needed for this specific test
+        _transferTokensForTest(LIQUIDITY_AMOUNT * ITERATIONS * 2, LIQUIDITY_AMOUNT * ITERATIONS * 2);
         
         BenchmarkResult memory result = _benchmarkAddLiquidityOperations();
         
@@ -189,26 +183,24 @@ contract Benchmark is Test {
             
             // Test Basic AMM add liquidity
             uint256 gasStart = gasleft();
-            vm.prank(alice);
             basicAmm.addLiquidity(
                 LIQUIDITY_AMOUNT, 
                 LIQUIDITY_AMOUNT, 
                 LIQUIDITY_AMOUNT * 95 / 100, 
                 LIQUIDITY_AMOUNT * 95 / 100, 
-                alice
+                deployer
             );
             uint256 basicGas = gasStart - gasleft();
             totalBasicGas += basicGas;
             
             // Test Blended AMM add liquidity
             gasStart = gasleft();
-            vm.prank(alice);
             blendedAmm.addLiquidity(
                 LIQUIDITY_AMOUNT, 
                 LIQUIDITY_AMOUNT, 
                 LIQUIDITY_AMOUNT * 95 / 100, 
                 LIQUIDITY_AMOUNT * 95 / 100, 
-                alice
+                deployer
             );
             uint256 blendedGas = gasStart - gasleft();
             totalBlendedGas += blendedGas;
@@ -225,6 +217,9 @@ contract Benchmark is Test {
     // ============ Remove Liquidity Benchmarking ============
     function testRemoveLiquidityBenchmark() public {
         console2.log("\n=== REMOVE LIQUIDITY BENCHMARK ===");
+        
+        // Transfer tokens needed for this specific test (liquidity operations recycle tokens)
+        _transferTokensForTest(LIQUIDITY_AMOUNT * 2, LIQUIDITY_AMOUNT * 2);
         
         BenchmarkResult memory result = _benchmarkRemoveLiquidityOperations();
         
@@ -246,15 +241,15 @@ contract Benchmark is Test {
             _addLiquidityToBothAMMs();
             
             // Get LP token balances
-            uint256 basicLPTokens = basicAmm.balanceOf(alice);
-            uint256 blendedLPTokens = blendedAmm.balanceOf(alice);
+            uint256 basicLPTokens = basicAmm.balanceOf(deployer);
+            uint256 blendedLPTokens = blendedAmm.balanceOf(deployer);
             
-            uint256 removeAmount = basicLPTokens * REMOVE_PERCENTAGE / 100;
+            uint256 basicRemoveAmount = basicLPTokens * REMOVE_PERCENTAGE / 100;
+            uint256 blendedRemoveAmount = blendedLPTokens * REMOVE_PERCENTAGE / 100;
             
             // Test Basic AMM remove liquidity
             uint256 gasStart = gasleft();
-            vm.prank(alice);
-            basicAmm.removeLiquidity(removeAmount, 0, 0, alice);
+            basicAmm.removeLiquidity(basicRemoveAmount, 0, 0, deployer);
             uint256 basicGas = gasStart - gasleft();
             totalBasicGas += basicGas;
             
@@ -264,8 +259,7 @@ contract Benchmark is Test {
             
             // Test Blended AMM remove liquidity
             gasStart = gasleft();
-            vm.prank(alice);
-            blendedAmm.removeLiquidity(removeAmount, 0, 0, alice);
+            blendedAmm.removeLiquidity(blendedRemoveAmount, 0, 0, deployer);
             uint256 blendedGas = gasStart - gasleft();
             totalBlendedGas += blendedGas;
             
@@ -298,6 +292,9 @@ contract Benchmark is Test {
         // Get reserves from both AMMs
         (uint256 basicReserve0, uint256 basicReserve1) = basicAmm.getReserves();
         (uint256 blendedReserve0, uint256 blendedReserve1) = blendedAmm.getReserves();
+
+        console2.log("  Basic AMM reserves:", basicReserve0 / 1e18, basicReserve1 / 1e18);
+        console2.log("  Blended AMM reserves:", blendedReserve0 / 1e18, blendedReserve1 / 1e18);
         
         // Calculate expected LP tokens using mathematical engine
         bool useBabylonian = blendedAmm.useBabylonian();
@@ -308,8 +305,8 @@ contract Benchmark is Test {
         );
         
         // Compare with actual LP tokens received
-        uint256 basicLPTokens = basicAmm.balanceOf(alice);
-        uint256 blendedLPTokens = blendedAmm.balanceOf(alice);
+        uint256 basicLPTokens = basicAmm.balanceOf(deployer);
+        uint256 blendedLPTokens = blendedAmm.balanceOf(deployer);
         
         console2.log("  Expected LP tokens:", expectedLPTokens / 1e18);
         console2.log("  Basic AMM LP tokens:", basicLPTokens / 1e18);
@@ -342,13 +339,9 @@ contract Benchmark is Test {
         bool useBabylonian = blendedAmm.useBabylonian();
         uint256 rustIL = mathEngine.calculateImpermanentLoss(initialPrice, currentPrice, useBabylonian);
         
-        // Calculate using Solidity approximation (if available)
-        uint256 solidityIL = _calculateImpermanentLossSolidity(initialPrice, currentPrice);
-        
         console2.log("  Initial price ratio: 1:1");
         console2.log("  Current price ratio: 1.5:1");
         console2.log("  Rust calculation:", rustIL, "basis points");
-        console2.log("  Solidity calculation:", solidityIL, "basis points");
         
         if (rustIL != 0) {
             console2.log("  [SUCCESS] Rust mathematical engine working correctly");
@@ -389,63 +382,48 @@ contract Benchmark is Test {
     }
 
     // ============ Helper Functions ============
-    function _ensureLiquidityInBothAMMs() internal {
-        // Check if both AMMs have sufficient liquidity
-        (uint256 basicReserve0, uint256 basicReserve1) = basicAmm.getReserves();
-        (uint256 blendedReserve0, uint256 blendedReserve1) = blendedAmm.getReserves();
+    
+    /// @dev Transfer tokens from deployer to test contract for specific test requirements
+    /// @param amountA Amount of Token A needed for the test
+    /// @param amountB Amount of Token B needed for the test
+    function _transferTokensForTest(uint256 amountA, uint256 amountB) internal {
+        console2.log("Transferring tokens for test - Token A:", amountA / 1e18, "Token B:", amountB / 1e18);
         
-        uint256 minLiquidity = LIQUIDITY_AMOUNT * 2;
+        // Transfer Token A
+        vm.prank(deployer);
+        tokenA.transfer(address(this), amountA);
         
-        if (basicReserve0 < minLiquidity || basicReserve1 < minLiquidity) {
-            console2.log("Adding liquidity to Basic AMM...");
-            vm.prank(alice);
-            basicAmm.addLiquidity(
-                LIQUIDITY_AMOUNT, 
-                LIQUIDITY_AMOUNT, 
-                LIQUIDITY_AMOUNT * 95 / 100, 
-                LIQUIDITY_AMOUNT * 95 / 100, 
-                alice
-            );
-        }
+        // Transfer Token B
+        vm.prank(deployer);
+        tokenB.transfer(address(this), amountB);
         
-        if (blendedReserve0 < minLiquidity || blendedReserve1 < minLiquidity) {
-            console2.log("Adding liquidity to Blended AMM...");
-            vm.prank(alice);
-            blendedAmm.addLiquidity(
-                LIQUIDITY_AMOUNT, 
-                LIQUIDITY_AMOUNT, 
-                LIQUIDITY_AMOUNT * 95 / 100, 
-                LIQUIDITY_AMOUNT * 95 / 100, 
-                alice
-            );
-        }
+        console2.log("Test contract balances after transfer:");
+        console2.log("  Token A:", tokenA.balanceOf(address(this)) / 1e18);
+        console2.log("  Token B:", tokenB.balanceOf(address(this)) / 1e18);
     }
 
     function _addLiquidityToBothAMMs() internal {
-        vm.prank(alice);
         basicAmm.addLiquidity(
             LIQUIDITY_AMOUNT, 
             LIQUIDITY_AMOUNT, 
             LIQUIDITY_AMOUNT * 95 / 100, 
             LIQUIDITY_AMOUNT * 95 / 100, 
-            alice
+            address(this)
         );
         
-        vm.prank(alice);
         blendedAmm.addLiquidity(
             LIQUIDITY_AMOUNT, 
             LIQUIDITY_AMOUNT, 
             LIQUIDITY_AMOUNT * 95 / 100, 
             LIQUIDITY_AMOUNT * 95 / 100, 
-            alice
+            address(this)
         );
     }
 
     function _approveTokensForSwapping() internal {
-        vm.startPrank(bob);
+        // Deployer approves tokens for swapping
         tokenA.approve(address(basicAmm), type(uint256).max);
         tokenA.approve(address(blendedAmm), type(uint256).max);
-        vm.stopPrank();
     }
 
     function _resetSwapState() internal {
@@ -455,17 +433,15 @@ contract Benchmark is Test {
 
     function _resetLiquidityState() internal {
         // Remove any existing LP tokens to start fresh
-        uint256 basicLP = basicAmm.balanceOf(alice);
-        uint256 blendedLP = blendedAmm.balanceOf(alice);
+        uint256 basicLP = basicAmm.balanceOf(address(this));
+        uint256 blendedLP = blendedAmm.balanceOf(address(this));
         
         if (basicLP > 0) {
-            vm.prank(alice);
-            basicAmm.removeLiquidity(basicLP, 0, 0, alice);
+            basicAmm.removeLiquidity(basicLP, 0, 0, address(this));
         }
         
         if (blendedLP > 0) {
-            vm.prank(alice);
-            blendedAmm.removeLiquidity(blendedLP, 0, 0, alice);
+            blendedAmm.removeLiquidity(blendedLP, 0, 0, address(this));
         }
     }
 
@@ -518,40 +494,6 @@ contract Benchmark is Test {
         } else {
             console2.log("  [WARNING] Basic AMM is more gas-efficient for liquidity operations");
             console2.log("  [INFO] Consider if the precision improvements justify the gas cost");
-        }
-    }
-
-    // ============ Solidity Fallback Calculations ============
-    function _calculateImpermanentLossSolidity(uint256 initialPrice, uint256 currentPrice) internal pure returns (uint256) {
-        // Simplified impermanent loss calculation for comparison
-        // This is a basic approximation - the Rust version should be more accurate
-        
-        if (currentPrice == initialPrice) return 0;
-        
-        // Calculate price change ratio
-        uint256 priceRatio = currentPrice * 1e18 / initialPrice;
-        
-        // Simplified IL calculation (this is not the exact formula)
-        if (priceRatio > 1e18) {
-            // Price went up
-            uint256 sqrtRatio = _sqrtBabylonian(priceRatio);
-            uint256 il = ((sqrtRatio - 1e18) * 10000) / 1e18; // Convert to basis points
-            return il > 10000 ? 10000 : il; // Cap at 100%
-        } else {
-            // Price went down
-            uint256 sqrtRatio = _sqrtBabylonian(priceRatio);
-            uint256 il = ((1e18 - sqrtRatio) * 10000) / 1e18; // Convert to basis points
-            return il > 10000 ? 10000 : il; // Cap at 100%
-        }
-    }
-
-    function _sqrtBabylonian(uint256 x) internal pure returns (uint256 y) {
-        if (x == 0) return 0;
-        uint256 z = (x + 1) / 2;
-        y = x;
-        while (z < y) {
-            y = z;
-            z = (x / z + z) / 2;
         }
     }
 

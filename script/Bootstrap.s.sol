@@ -18,11 +18,6 @@ contract Bootstrap is Script {
     IERC20 public tokenA;
     IERC20 public tokenB;
 
-    // Test accounts
-    address public alice;
-    address public bob;
-    address public charlie;
-
     // Deployment configuration
     string public deploymentFilePath;
 
@@ -40,17 +35,11 @@ contract Bootstrap is Script {
         // Load deployment addresses
         loadDeployedContracts();
 
-        // Setup test accounts
-        setupTestAccounts();
-
         // Start broadcasting
         vm.startBroadcast();
 
         // Step 1: Add initial liquidity to both AMMs
         addInitialLiquidity();
-
-        // Step 2: Fund test accounts with tokens
-        fundTestAccounts();
 
         vm.stopBroadcast();
 
@@ -76,25 +65,14 @@ contract Bootstrap is Script {
         console.log("  Blended AMM:", address(blendedAmm));
     }
 
-    function setupTestAccounts() internal {
-        // Use deterministic addresses for consistency
-        alice = vm.addr(1);
-        bob = vm.addr(2);
-        charlie = vm.addr(3);
-
-        console.log("\nTest accounts:");
-        console.log("  Alice:", alice);
-        console.log("  Bob:", bob);
-        console.log("  Charlie:", charlie);
-    }
-
     function addInitialLiquidity() internal {
         console.log("\n=== Adding Initial Liquidity ===");
 
-        // Check deployer balance
+        // Check deployer balance (msg.sender should be your account when run with --broadcast)
         uint256 balanceA = tokenA.balanceOf(msg.sender);
         uint256 balanceB = tokenB.balanceOf(msg.sender);
 
+        console.log("Deployer address (msg.sender):", msg.sender);
         console.log("Deployer Token A balance:", balanceA / 1e18);
         console.log("Deployer Token B balance:", balanceB / 1e18);
 
@@ -132,25 +110,6 @@ contract Bootstrap is Script {
         console.log("  LP tokens received:", blendedLiquidity / 1e18);
     }
 
-    function fundTestAccounts() internal {
-        console.log("\n=== Funding Test Accounts ===");
-
-        // Fund Alice (liquidity provider)
-        console.log("Funding Alice...");
-        require(tokenA.transfer(alice, TEST_TOKENS_PER_USER), "Token A transfer to Alice failed");
-        require(tokenB.transfer(alice, TEST_TOKENS_PER_USER), "Token B transfer to Alice failed");
-
-        // Fund Bob (swapper)
-        console.log("Funding Bob...");
-        require(tokenA.transfer(bob, TEST_TOKENS_PER_USER), "Token A transfer to Bob failed");
-        require(tokenB.transfer(bob, TEST_TOKENS_PER_USER), "Token B transfer to Bob failed");
-
-        // Fund Charlie (additional tester)
-        console.log("Funding Charlie...");
-        require(tokenA.transfer(charlie, TEST_TOKENS_PER_USER / 2), "Token A transfer to Charlie failed");
-        require(tokenB.transfer(charlie, TEST_TOKENS_PER_USER / 2), "Token B transfer to Charlie failed");
-    }
-
     function verifySetup() internal view {
         console.log("\n=== Verifying Setup ===");
 
@@ -164,20 +123,6 @@ contract Bootstrap is Script {
         console.log("Blended AMM Reserves:");
         console.log("  Token A:", blendedReserve0 / 1e18);
         console.log("  Token B:", blendedReserve1 / 1e18);
-
-        // Check test account balances
-        console.log("\nTest Account Balances:");
-        console.log("Alice:");
-        console.log("  Token A:", tokenA.balanceOf(alice) / 1e18);
-        console.log("  Token B:", tokenB.balanceOf(alice) / 1e18);
-
-        console.log("Bob:");
-        console.log("  Token A:", tokenA.balanceOf(bob) / 1e18);
-        console.log("  Token B:", tokenB.balanceOf(bob) / 1e18);
-
-        console.log("Charlie:");
-        console.log("  Token A:", tokenA.balanceOf(charlie) / 1e18);
-        console.log("  Token B:", tokenB.balanceOf(charlie) / 1e18);
 
         // Verify AMM approvals
         console.log("\nAMM Approvals:");

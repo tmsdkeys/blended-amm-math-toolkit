@@ -1,4 +1,4 @@
-gblend verify-contract $BASIC_AMM BasicAMM \
+gblend verify-contract 0xC48B2aCb4876f55feDC2D55ECEf2b1e9c3b6a1D4 BasicAMM \
     --verifier blockscout \
     --verifier-url https://testnet.fluentscan.xyz/api/ \
     --constructor-args $(cast abi-encode "constructor(address,address,string,string)" $TOKEN_A $TOKEN_B "Basic AMM LP Token" "BAMM-LP")
