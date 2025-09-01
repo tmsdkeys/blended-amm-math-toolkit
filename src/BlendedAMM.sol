@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IAmm} from "./IAmm.sol";
 // Import the auto-generated interface from gblend
 import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol";
 
@@ -14,7 +15,7 @@ import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol"
  * that leverages Rust mathematical engine for high-precision calculations
  * and advanced features.
  */
-contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
+contract BlendedAMM is ERC20, ReentrancyGuard, Ownable, IAmm {
     // ============ State Variables ============
 
     IERC20 public immutable TOKEN0;
@@ -45,19 +46,12 @@ contract BlendedAMM is ERC20, ReentrancyGuard, Ownable {
 
     event Swap(address indexed user, address indexed tokenIn, uint256 amountIn, uint256 amountOut, uint256 dynamicFee);
 
-    event LiquidityAdded(address indexed provider, uint256 amount0, uint256 amount1, uint256 liquidity);
-
-    event LiquidityRemoved(address indexed provider, uint256 amount0, uint256 amount1, uint256 liquidity);
-
     event DynamicFeeUpdated(uint256 newFee);
 
     event UseBabylonianUpdated(bool newUseBabylonian);
     event BaseFeeRateUpdated(uint256 newBaseFeeRate);
     event DynamicFeesEnabledUpdated(bool newDynamicFeesEnabled);
     event PriceVolatilityUpdated(uint256 newPriceVolatility);
-
-    // Gas tracking event
-    event GasUsageRecorded(string operation, uint256 gasUsed);
 
     // ============ Constructor ============
 

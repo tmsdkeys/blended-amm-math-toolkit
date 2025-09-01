@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IAmm} from "./IAmm.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -12,7 +13,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * This contract demonstrates standard Solidity mathematical operations
  * that are candidates to be optimized with Rust.
  */
-contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
+contract BasicAMM is ERC20, ReentrancyGuard, Ownable, IAmm {
     // ============ State Variables ============
 
     IERC20 public immutable TOKEN0;
@@ -30,16 +31,6 @@ contract BasicAMM is ERC20, ReentrancyGuard, Ownable {
     uint256 public lastRemoveLiquidityGasUsed;
 
     // ============ Events ============
-
-    event Swap(
-        address indexed user, address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut
-    );
-
-    event LiquidityAdded(address indexed provider, uint256 amount0, uint256 amount1, uint256 liquidity);
-
-    event LiquidityRemoved(address indexed provider, uint256 amount0, uint256 amount1, uint256 liquidity);
-
-    event GasUsageRecorded(string operation, uint256 gasUsed);
 
     // Admin events
     event FeeRateUpdated(uint256 newFeeRate);
