@@ -86,6 +86,10 @@ contract Benchmark is Test {
         console2.log("Deployer ETH balance:", deployer.balance / 1e18);
         console2.log("Using deployer account for all test operations");
 
+        // Set up token approvals for the test contract (using vm.prank to impersonate test contract)
+        console2.log("Setting up token approvals for test contract...");
+        _setupTestContractApprovals();
+
         // Verify bootstrap was run
         // _verifyBootstrapSetup();
     }
@@ -118,13 +122,15 @@ contract Benchmark is Test {
         _transferTokensForTest(LIQUIDITY_AMOUNT * 2, LIQUIDITY_AMOUNT * 2);
         _addLiquidityToBothAMMs();
         
-        // Approve tokens for swapping
-        _approveTokensForSwapping();
+
         
         BenchmarkResult memory result = _benchmarkSwapOperations();
         
         _reportBenchmarkResult("Swap Operations", result);
         _analyzeSwapResults(result);
+        
+        // Clean up all tokens after the test
+        _cleanupTestTokens();
     }
 
     function _benchmarkSwapOperations() internal returns (BenchmarkResult memory) {
@@ -169,6 +175,9 @@ contract Benchmark is Test {
         
         _reportBenchmarkResult("Add Liquidity Operations", result);
         _analyzeLiquidityResults(result);
+        
+        // Clean up all tokens after the test
+        _cleanupTestTokens();
     }
 
     function _benchmarkAddLiquidityOperations() internal returns (BenchmarkResult memory) {
@@ -225,6 +234,9 @@ contract Benchmark is Test {
         
         _reportBenchmarkResult("Remove Liquidity Operations", result);
         _analyzeLiquidityResults(result);
+        
+        // Clean up all tokens after the test
+        _cleanupTestTokens();
     }
 
     function _benchmarkRemoveLiquidityOperations() internal returns (BenchmarkResult memory) {
@@ -241,25 +253,21 @@ contract Benchmark is Test {
             _addLiquidityToBothAMMs();
             
             // Get LP token balances
-            uint256 basicLPTokens = basicAmm.balanceOf(deployer);
-            uint256 blendedLPTokens = blendedAmm.balanceOf(deployer);
+            uint256 basicLPTokens = basicAmm.balanceOf(address(this));
+            uint256 blendedLPTokens = blendedAmm.balanceOf(address(this));
             
             uint256 basicRemoveAmount = basicLPTokens * REMOVE_PERCENTAGE / 100;
             uint256 blendedRemoveAmount = blendedLPTokens * REMOVE_PERCENTAGE / 100;
-            
+
             // Test Basic AMM remove liquidity
             uint256 gasStart = gasleft();
-            basicAmm.removeLiquidity(basicRemoveAmount, 0, 0, deployer);
+            basicAmm.removeLiquidity(basicRemoveAmount, 0, 0, address(this));
             uint256 basicGas = gasStart - gasleft();
             totalBasicGas += basicGas;
             
-            // Reset and add liquidity again for Blended AMM test
-            _resetLiquidityState();
-            _addLiquidityToBothAMMs();
-            
             // Test Blended AMM remove liquidity
             gasStart = gasleft();
-            blendedAmm.removeLiquidity(blendedRemoveAmount, 0, 0, deployer);
+            blendedAmm.removeLiquidity(blendedRemoveAmount, 0, 0, address(this));
             uint256 blendedGas = gasStart - gasleft();
             totalBlendedGas += blendedGas;
             
@@ -383,6 +391,21 @@ contract Benchmark is Test {
 
     // ============ Helper Functions ============
     
+    /// @dev Set up token approvals for the test contract in setUp()
+    /// Uses vm.prank to impersonate the test contract and approve AMMs
+    function _setupTestContractApprovals() internal {
+        // Impersonate the test contract to set up approvals
+        vm.prank(address(this));
+        tokenA.approve(address(basicAmm), type(uint256).max);
+        tokenA.approve(address(blendedAmm), type(uint256).max);
+        
+        vm.prank(address(this));
+        tokenB.approve(address(basicAmm), type(uint256).max);
+        tokenB.approve(address(blendedAmm), type(uint256).max);
+        
+        console2.log("Test contract approvals set up:");
+    }
+    
     /// @dev Transfer tokens from deployer to test contract for specific test requirements
     /// @param amountA Amount of Token A needed for the test
     /// @param amountB Amount of Token B needed for the test
@@ -400,6 +423,41 @@ contract Benchmark is Test {
         console2.log("Test contract balances after transfer:");
         console2.log("  Token A:", tokenA.balanceOf(address(this)) / 1e18);
         console2.log("  Token B:", tokenB.balanceOf(address(this)) / 1e18);
+    }
+    
+    /// @dev Clean up all tokens from test contract and return them to deployer
+    /// This ensures test isolation and prevents token leakage between tests
+    function _cleanupTestTokens() internal {
+        console2.log("Cleaning up test contract tokens...");
+        
+        // Remove any remaining LP tokens and get underlying tokens back
+        _resetLiquidityState();
+        
+        // Transfer remaining ERC20 tokens back to deployer
+        uint256 remainingTokenA = tokenA.balanceOf(address(this));
+        uint256 remainingTokenB = tokenB.balanceOf(address(this));
+        
+        if (remainingTokenA > 0) {
+            console2.log("  Returning Token A:", remainingTokenA / 1e18);
+            tokenA.transfer(deployer, remainingTokenA);
+        }
+        
+        if (remainingTokenB > 0) {
+            console2.log("  Returning Token B:", remainingTokenB / 1e18);
+            tokenB.transfer(deployer, remainingTokenB);
+        }
+        
+        // Verify cleanup
+        uint256 finalTokenA = tokenA.balanceOf(address(this));
+        uint256 finalTokenB = tokenB.balanceOf(address(this));
+        
+        console2.log("Test contract final balances:");
+        console2.log("  Token A:", finalTokenA / 1e18);
+        console2.log("  Token B:", finalTokenB / 1e18);
+        
+        require(finalTokenA == 0, "Token A cleanup failed");
+        require(finalTokenB == 0, "Token B cleanup failed");
+        console2.log("  [SUCCESS] All tokens cleaned up successfully");
     }
 
     function _addLiquidityToBothAMMs() internal {
@@ -420,10 +478,19 @@ contract Benchmark is Test {
         );
     }
 
-    function _approveTokensForSwapping() internal {
-        // Deployer approves tokens for swapping
+    function _approveTokensForOperations() internal {
+        // Test contract approves AMMs to spend its tokens
+        console2.log("Test contract approving AMMs to spend tokens...");
         tokenA.approve(address(basicAmm), type(uint256).max);
         tokenA.approve(address(blendedAmm), type(uint256).max);
+        tokenB.approve(address(basicAmm), type(uint256).max);
+        tokenB.approve(address(blendedAmm), type(uint256).max);
+        
+        console2.log("Approvals completed:");
+        console2.log("  Basic AMM Token A allowance:", tokenA.allowance(address(this), address(basicAmm)) / 1e18);
+        console2.log("  Basic AMM Token B allowance:", tokenB.allowance(address(this), address(basicAmm)) / 1e18);
+        console2.log("  Blended AMM Token A allowance:", tokenA.allowance(address(this), address(blendedAmm)) / 1e18);
+        console2.log("  Blended AMM Token B allowance:", tokenB.allowance(address(this), address(blendedAmm)) / 1e18);
     }
 
     function _resetSwapState() internal {
