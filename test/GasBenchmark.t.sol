@@ -5,25 +5,23 @@ import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {BasicAMM} from "../src/BasicAMM.sol";
 import {BlendedAMM} from "../src/BlendedAMM.sol";
-import {IMathematicalEngine} from "../out/MathematicalEngine.wasm/interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IAmm} from "../src/IAmm.sol";
 
 /**
- * @title Benchmark
+ * @title GasBenchmark
  * @dev Comprehensive benchmarking of BasicAMM vs BlendedAMM using deployed contracts
  * 
  * This test suite:
  * 1. Uses actual deployed contracts and ERC20s from bootstrap
  * 2. Compares all AMM operations: swap, addLiquidity, removeLiquidity
- * 3. Measures calculation accuracy (LP tokens, impermanent loss)
- * 4. Benchmarks gas usage with multiple iterations for statistical significance
- * 5. Provides comprehensive analysis and recommendations
+ * 3. Benchmarks gas usage with multiple iterations for statistical significance
+ * 4. Provides comprehensive analysis and recommendations
  */
-contract Benchmark is Test {
+contract GasBenchmark is Test {
     // ============ Contract Instances ============
     BasicAMM public basicAmm;
     BlendedAMM public blendedAmm;
-    IMathematicalEngine public mathEngine;
     IERC20 public tokenA;
     IERC20 public tokenB;
 
@@ -31,10 +29,10 @@ contract Benchmark is Test {
     address public deployer; // Deployer account for all operations
 
     // ============ Test Configuration ============
-    uint256 constant ITERATIONS = 5;           // Number of iterations for averaging
-    uint256 constant SWAP_AMOUNT = 100 * 1e18; // Base swap amount
-    uint256 constant LIQUIDITY_AMOUNT = 1000 * 1e18; // Base liquidity amount
-    uint256 constant REMOVE_PERCENTAGE = 25;   // Percentage of LP tokens to remove
+    uint256 constant ITERATIONS = 4;                // Number of iterations for averaging (1 warm up call)
+    uint256 constant SWAP_AMOUNT = 100 * 1e18;      // Base swap amount
+    uint256 constant LIQUIDITY_AMOUNT = 1000 * 1e18;// Base liquidity amount
+    uint256 constant REMOVE_PERCENTAGE = 25;        // Percentage of LP tokens to remove
 
     // ============ Benchmark Results ============
     struct BenchmarkResult {
@@ -67,14 +65,12 @@ contract Benchmark is Test {
         // Load contract instances
         tokenA = IERC20(vm.parseJsonAddress(deploymentData, ".tokenA"));
         tokenB = IERC20(vm.parseJsonAddress(deploymentData, ".tokenB"));
-        mathEngine = IMathematicalEngine(vm.parseJsonAddress(deploymentData, ".mathEngine"));
         basicAmm = BasicAMM(vm.parseJsonAddress(deploymentData, ".basicAMM"));
         blendedAmm = BlendedAMM(vm.parseJsonAddress(deploymentData, ".blendedAMM"));
 
         console2.log("Contracts loaded:");
         console2.log("  Token A:", address(tokenA));
         console2.log("  Token B:", address(tokenB));
-        console2.log("  Math Engine:", address(mathEngine));
         console2.log("  Basic AMM:", address(basicAmm));
         console2.log("  Blended AMM:", address(blendedAmm));
 
@@ -91,7 +87,7 @@ contract Benchmark is Test {
         _setupTestContractApprovals();
 
         // Verify bootstrap was run
-        // _verifyBootstrapSetup();
+        _verifyBootstrapSetup();
     }
 
     // ============ Bootstrap Verification ============
@@ -99,15 +95,12 @@ contract Benchmark is Test {
         uint256 deployerBalanceA = tokenA.balanceOf(deployer);
         uint256 deployerBalanceB = tokenB.balanceOf(deployer);
 
-        console2.log("Deployer balance:", deployerBalanceA / 1e18);
-        console2.log("Deployer balance:", deployerBalanceB / 1e18);
-
         require(deployerBalanceA >= LIQUIDITY_AMOUNT * 2, "Deployer needs more Token A - run bootstrap first");
         require(deployerBalanceB >= LIQUIDITY_AMOUNT * 2, "Deployer needs more Token B - run bootstrap first");
 
         console2.log("Bootstrap verification passed:");
-        console2.log("  Deployer Token A:", deployerBalanceA / 1e18);
-        console2.log("  Deployer Token B:", deployerBalanceB / 1e18);
+        console2.log("  Deployer Token A balance:", deployerBalanceA / 1e18);
+        console2.log("  Deployer Token B balance:", deployerBalanceB / 1e18);
     }
 
     // ============ Swap Benchmarking ============
@@ -115,14 +108,13 @@ contract Benchmark is Test {
         console2.log("\n=== SWAP OPERATION BENCHMARK ===");
         
         // Transfer tokens needed for this specific test
-        _transferTokensForTest(SWAP_AMOUNT * ITERATIONS * 2, 0);
+        _transferTokensForTest(SWAP_AMOUNT * (ITERATIONS + 1) * 2, 0);
         
         // Reset any existing state and ensure both AMMs have liquidity
         _resetLiquidityState();
         _transferTokensForTest(LIQUIDITY_AMOUNT * 2, LIQUIDITY_AMOUNT * 2);
-        _addLiquidityToBothAMMs();
-        
-
+        _addLiquidityToAMM(basicAmm);
+        _addLiquidityToAMM(blendedAmm);
         
         BenchmarkResult memory result = _benchmarkSwapOperations();
         
@@ -136,6 +128,11 @@ contract Benchmark is Test {
     function _benchmarkSwapOperations() internal returns (BenchmarkResult memory) {
         uint256 totalBasicGas = 0;
         uint256 totalBlendedGas = 0;
+
+        // Warm-up calls to eliminate cold storage effects
+        console2.log("Running warm-up calls...");
+        basicAmm.swap(address(tokenA), SWAP_AMOUNT, 0, deployer);
+        blendedAmm.swap(address(tokenA), SWAP_AMOUNT, 0, deployer);
         
         console2.log("Running", ITERATIONS, "swap iterations for averaging...");
         
@@ -169,21 +166,42 @@ contract Benchmark is Test {
         console2.log("\n=== ADD LIQUIDITY BENCHMARK ===");
         
         // Transfer tokens needed for this specific test
-        _transferTokensForTest(LIQUIDITY_AMOUNT * ITERATIONS * 2, LIQUIDITY_AMOUNT * ITERATIONS * 2);
+        _transferTokensForTest(LIQUIDITY_AMOUNT * (ITERATIONS + 1) * 3, LIQUIDITY_AMOUNT * (ITERATIONS + 1) * 3);
         
-        BenchmarkResult memory result = _benchmarkAddLiquidityOperations();
+        (BenchmarkResult memory resultBabylon, BenchmarkResult memory resultNewton) = _benchmarkAddLiquidityOperations();
         
-        _reportBenchmarkResult("Add Liquidity Operations", result);
-        _analyzeLiquidityResults(result);
+        _reportBenchmarkResult("Add Liquidity Operations (Babylonian)", resultBabylon);
+        _analyzeLiquidityResults(resultBabylon);
+
+        _reportBenchmarkResult("Add Liquidity Operations (Newton-Raphson)", resultNewton);
+        _analyzeLiquidityResults(resultNewton);
+
+        // _reportBabylonianComparison("Add Liquidity Operations", resultBabylon, resultNewton);
+        // _analyzeBabylonianResults(resultBabylon, resultNewton);
         
         // Clean up all tokens after the test
         _cleanupTestTokens();
     }
 
-    function _benchmarkAddLiquidityOperations() internal returns (BenchmarkResult memory) {
-        uint256 totalBasicGas = 0;
-        uint256 totalBlendedGas = 0;
-        
+    function _benchmarkAddLiquidityOperations() internal returns (BenchmarkResult memory, BenchmarkResult memory) {
+        uint256 totalBasicGas;
+        uint256 totalBlendedGasBabylon;
+        uint256 totalBlendedGasNewton;
+
+        // Reset state
+        _resetLiquidityState();
+
+        console2.log("Running warm-up calls...");
+        _addLiquidityToAMM(basicAmm);
+        _addLiquidityToAMM(blendedAmm);
+        _setUseBabylonian(false);
+
+        _resetLiquidityState();
+
+        _addLiquidityToAMM(basicAmm);
+        _addLiquidityToAMM(blendedAmm);
+        _setUseBabylonian(true);
+
         console2.log("Running", ITERATIONS, "add liquidity iterations for averaging...");
         
         for (uint256 i = 0; i < ITERATIONS; i++) {
@@ -192,39 +210,39 @@ contract Benchmark is Test {
             
             // Test Basic AMM add liquidity
             uint256 gasStart = gasleft();
-            basicAmm.addLiquidity(
-                LIQUIDITY_AMOUNT, 
-                LIQUIDITY_AMOUNT, 
-                LIQUIDITY_AMOUNT * 95 / 100, 
-                LIQUIDITY_AMOUNT * 95 / 100, 
-                deployer
-            );
+            _addLiquidityToAMM(basicAmm);
             uint256 basicGas = gasStart - gasleft();
             totalBasicGas += basicGas;
             
             // Test Blended AMM add liquidity
             gasStart = gasleft();
-            blendedAmm.addLiquidity(
-                LIQUIDITY_AMOUNT, 
-                LIQUIDITY_AMOUNT, 
-                LIQUIDITY_AMOUNT * 95 / 100, 
-                LIQUIDITY_AMOUNT * 95 / 100, 
-                deployer
-            );
-            uint256 blendedGas = gasStart - gasleft();
-            totalBlendedGas += blendedGas;
+            _addLiquidityToAMM(blendedAmm);
+            uint256 blendedGasBabylon = gasStart - gasleft();
+            totalBlendedGasBabylon += blendedGasBabylon;
+
+            // Test Blended AMM add liquidity
+            _setUseBabylonian(false);
+            gasStart = gasleft();
+            _addLiquidityToAMM(blendedAmm);
+            uint256 blendedGasNewton = gasStart - gasleft();
+            totalBlendedGasNewton += blendedGasNewton;
+            _setUseBabylonian(true);
             
-            console2.log("  Iteration %d | Basic: %d | Blended: %d", i + 1, basicGas, blendedGas);
+            console2.log("  Iteration %d | Basic: %d | Blended Babylonian: %d", i + 1, basicGas, blendedGasBabylon);
+            console2.log("  Iteration %d | Basic: %d | Blended Newton-Raphson: %d", i + 1, basicGas, blendedGasNewton);
         }
         
         uint256 avgBasicGas = totalBasicGas / ITERATIONS;
-        uint256 avgBlendedGas = totalBlendedGas / ITERATIONS;
+        uint256 avgBlendedGasBabylon = totalBlendedGasBabylon / ITERATIONS;
+        uint256 avgBlendedGasNewton = totalBlendedGasNewton / ITERATIONS;
         
-        return _calculateBenchmarkResult(avgBasicGas, avgBlendedGas);
+        return (_calculateBenchmarkResult(avgBasicGas, avgBlendedGasBabylon), _calculateBenchmarkResult(avgBasicGas, avgBlendedGasNewton));
     }
 
     // ============ Remove Liquidity Benchmarking ============
     function testRemoveLiquidityBenchmark() public {
+        // Removing liquidity uses the same Solidity functions in both Blended and Basic AMMs
+        // Therefore we expect the results to be the same and no difference in gas usage
         console2.log("\n=== REMOVE LIQUIDITY BENCHMARK ===");
         
         // Transfer tokens needed for this specific test (liquidity operations recycle tokens)
@@ -240,156 +258,50 @@ contract Benchmark is Test {
     }
 
     function _benchmarkRemoveLiquidityOperations() internal returns (BenchmarkResult memory) {
-        uint256 totalBasicGas = 0;
-        uint256 totalBlendedGas = 0;
+        console2.log("Running", 1, "remove liquidity iterations for averaging...");
         
-        console2.log("Running", ITERATIONS, "remove liquidity iterations for averaging...");
+        // Reset state between iterations
+        _resetLiquidityState();
         
-        for (uint256 i = 0; i < ITERATIONS; i++) {
-            // Reset state between iterations
-            _resetLiquidityState();
-            
-            // Add liquidity first to both AMMs
-            _addLiquidityToBothAMMs();
-            
-            // Get LP token balances
-            uint256 basicLPTokens = basicAmm.balanceOf(address(this));
-            uint256 blendedLPTokens = blendedAmm.balanceOf(address(this));
-            
-            uint256 basicRemoveAmount = basicLPTokens * REMOVE_PERCENTAGE / 100;
-            uint256 blendedRemoveAmount = blendedLPTokens * REMOVE_PERCENTAGE / 100;
+        // Add liquidity first to both AMMs
+        _addLiquidityToAMM(basicAmm);
+        _addLiquidityToAMM(blendedAmm);
+        
+        // Get LP token balances
+        uint256 basicLPTokens = basicAmm.balanceOf(address(this));
+        uint256 blendedLPTokens = blendedAmm.balanceOf(address(this));
+        
+        uint256 basicRemoveAmount = basicLPTokens * REMOVE_PERCENTAGE / 100;
+        uint256 blendedRemoveAmount = blendedLPTokens * REMOVE_PERCENTAGE / 100;
 
-            // Test Basic AMM remove liquidity
-            uint256 gasStart = gasleft();
-            basicAmm.removeLiquidity(basicRemoveAmount, 0, 0, address(this));
-            uint256 basicGas = gasStart - gasleft();
-            totalBasicGas += basicGas;
-            
-            // Test Blended AMM remove liquidity
-            gasStart = gasleft();
-            blendedAmm.removeLiquidity(blendedRemoveAmount, 0, 0, address(this));
-            uint256 blendedGas = gasStart - gasleft();
-            totalBlendedGas += blendedGas;
-            
-            console2.log("  Iteration %d | Basic: %d | Blended: %d", i + 1, basicGas, blendedGas);
-        }
-        
-        uint256 avgBasicGas = totalBasicGas / ITERATIONS;
-        uint256 avgBlendedGas = totalBlendedGas / ITERATIONS;
-        
-        return _calculateBenchmarkResult(avgBasicGas, avgBlendedGas);
-    }
+        // Warm up calls to eliminate cold storage effects
+        basicAmm.removeLiquidity(basicRemoveAmount, 0, 0, address(this));
+        blendedAmm.removeLiquidity(blendedRemoveAmount, 0, 0, address(this));
 
-    // ============ Calculation Accuracy Testing ============
-    function testCalculationAccuracy() public {
-        console2.log("\n=== CALCULATION ACCURACY COMPARISON ===");
-        
-        // Test LP token calculation accuracy
-        _testLPTokenCalculationAccuracy();
-        
-        // Test impermanent loss calculation accuracy
-        _testImpermanentLossCalculationAccuracy();
-        
-        // Test mathematical engine functions directly
-        _testMathematicalEngineFunctions();
-    }
-
-    function _testLPTokenCalculationAccuracy() internal {
-        console2.log("Testing LP Token Calculation Accuracy...");
-        
-        // Get reserves from both AMMs
-        (uint256 basicReserve0, uint256 basicReserve1) = basicAmm.getReserves();
-        (uint256 blendedReserve0, uint256 blendedReserve1) = blendedAmm.getReserves();
-
-        console2.log("  Basic AMM reserves:", basicReserve0 / 1e18, basicReserve1 / 1e18);
-        console2.log("  Blended AMM reserves:", blendedReserve0 / 1e18, blendedReserve1 / 1e18);
-        
-        // Calculate expected LP tokens using mathematical engine
-        bool useBabylonian = blendedAmm.useBabylonian();
-        uint256 expectedLPTokens = mathEngine.calculateLpTokens(
-            LIQUIDITY_AMOUNT, 
-            LIQUIDITY_AMOUNT, 
-            useBabylonian
-        );
-        
-        // Compare with actual LP tokens received
-        uint256 basicLPTokens = basicAmm.balanceOf(deployer);
-        uint256 blendedLPTokens = blendedAmm.balanceOf(deployer);
-        
-        console2.log("  Expected LP tokens:", expectedLPTokens / 1e18);
-        console2.log("  Basic AMM LP tokens:", basicLPTokens / 1e18);
-        console2.log("  Blended AMM LP tokens:", blendedLPTokens / 1e18);
-        
-        // Calculate accuracy differences
-        uint256 basicDiff = basicLPTokens > expectedLPTokens ? 
-            basicLPTokens - expectedLPTokens : expectedLPTokens - basicLPTokens;
-        uint256 blendedDiff = blendedLPTokens > expectedLPTokens ? 
-            blendedLPTokens - expectedLPTokens : expectedLPTokens - blendedLPTokens;
-        
-        console2.log("  Basic AMM difference:", basicDiff / 1e18);
-        console2.log("  Blended AMM difference:", blendedDiff / 1e18);
-        
-        if (blendedDiff < basicDiff) {
-            console2.log("  [SUCCESS] Blended AMM is more accurate!");
-        } else {
-            console2.log("  [FAIL] Basic AMM is more accurate");
-        }
-    }
-
-    function _testImpermanentLossCalculationAccuracy() internal {
-        console2.log("Testing Impermanent Loss Calculation Accuracy...");
-        
-        // Simulate price change scenario
-        uint256 initialPrice = 1 * 1e18;  // 1:1 ratio
-        uint256 currentPrice = 15 * 1e17; // 1.5x price change
-        
-        // Calculate using mathematical engine
-        bool useBabylonian = blendedAmm.useBabylonian();
-        uint256 rustIL = mathEngine.calculateImpermanentLoss(initialPrice, currentPrice, useBabylonian);
-        
-        console2.log("  Initial price ratio: 1:1");
-        console2.log("  Current price ratio: 1.5:1");
-        console2.log("  Rust calculation:", rustIL, "basis points");
-        
-        if (rustIL != 0) {
-            console2.log("  [SUCCESS] Rust mathematical engine working correctly");
-        } else {
-            console2.log("  [FAIL] Rust mathematical engine calculation failed");
-        }
-    }
-
-    function _testMathematicalEngineFunctions() internal {
-        console2.log("Testing Mathematical Engine Functions Directly...");
-        
-        // Test square root calculation
-        uint256 testValue = 1000000 * 1e18;
-        bool useBabylonian = blendedAmm.useBabylonian();
-        
+        // Test Basic AMM remove liquidity
         uint256 gasStart = gasleft();
-        uint256 sqrtResult = mathEngine.calculatePreciseSquareRoot(testValue, useBabylonian);
-        uint256 sqrtGas = gasStart - gasleft();
+        basicAmm.removeLiquidity(basicRemoveAmount, 0, 0, address(this));
+        uint256 basicGas = gasStart - gasleft();
         
-        console2.log("  Square root of 1M tokens:", sqrtResult / 1e9, "(scaled down)");
-        console2.log("  Gas used for sqrt:", sqrtGas);
-        
-        // Test dynamic fee calculation
-        IMathematicalEngine.DynamicFeeParams memory feeParams = IMathematicalEngine.DynamicFeeParams({
-            volatility: 200,           // 200 basis points
-            volume_24h: 10000 * 1e18,  // 10k tokens
-            liquidity_depth: 1000000 * 1e18 // 1M tokens
-        });
-        
+        // Test Blended AMM remove liquidity
         gasStart = gasleft();
-        uint256 dynamicFee = mathEngine.calculateDynamicFee(feeParams);
-        uint256 feeGas = gasStart - gasleft();
+        blendedAmm.removeLiquidity(blendedRemoveAmount, 0, 0, address(this));
+        uint256 blendedGas = gasStart - gasleft();
         
-        console2.log("  Dynamic fee:", dynamicFee, "basis points");
-        console2.log("  Gas used for fee calc:", feeGas);
+        console2.log("  Basic: %d | Blended: %d ", basicGas, blendedGas);
         
-        console2.log("  [SUCCESS] Mathematical engine functions working correctly");
+        return _calculateBenchmarkResult(basicGas, blendedGas);
     }
 
     // ============ Helper Functions ============
+    
+    /// @dev Set the useBabylonian parameter on the BlendedAMM contract
+    /// @param useBabylonian The value to set for useBabylonian
+    function _setUseBabylonian(bool useBabylonian) internal {
+        vm.prank(deployer);
+        blendedAmm.setUseBabylonian(useBabylonian);
+        console2.log("  Set useBabylonian to:", useBabylonian);
+    }
     
     /// @dev Set up token approvals for the test contract in setUp()
     /// Uses vm.prank to impersonate the test contract and approve AMMs
@@ -398,8 +310,6 @@ contract Benchmark is Test {
         vm.prank(address(this));
         tokenA.approve(address(basicAmm), type(uint256).max);
         tokenA.approve(address(blendedAmm), type(uint256).max);
-        
-        vm.prank(address(this));
         tokenB.approve(address(basicAmm), type(uint256).max);
         tokenB.approve(address(blendedAmm), type(uint256).max);
         
@@ -460,37 +370,14 @@ contract Benchmark is Test {
         console2.log("  [SUCCESS] All tokens cleaned up successfully");
     }
 
-    function _addLiquidityToBothAMMs() internal {
-        basicAmm.addLiquidity(
+    function _addLiquidityToAMM(IAmm amm) internal {
+        amm.addLiquidity(
             LIQUIDITY_AMOUNT, 
             LIQUIDITY_AMOUNT, 
             LIQUIDITY_AMOUNT * 95 / 100, 
             LIQUIDITY_AMOUNT * 95 / 100, 
             address(this)
         );
-        
-        blendedAmm.addLiquidity(
-            LIQUIDITY_AMOUNT, 
-            LIQUIDITY_AMOUNT, 
-            LIQUIDITY_AMOUNT * 95 / 100, 
-            LIQUIDITY_AMOUNT * 95 / 100, 
-            address(this)
-        );
-    }
-
-    function _approveTokensForOperations() internal {
-        // Test contract approves AMMs to spend its tokens
-        console2.log("Test contract approving AMMs to spend tokens...");
-        tokenA.approve(address(basicAmm), type(uint256).max);
-        tokenA.approve(address(blendedAmm), type(uint256).max);
-        tokenB.approve(address(basicAmm), type(uint256).max);
-        tokenB.approve(address(blendedAmm), type(uint256).max);
-        
-        console2.log("Approvals completed:");
-        console2.log("  Basic AMM Token A allowance:", tokenA.allowance(address(this), address(basicAmm)) / 1e18);
-        console2.log("  Basic AMM Token B allowance:", tokenB.allowance(address(this), address(basicAmm)) / 1e18);
-        console2.log("  Blended AMM Token A allowance:", tokenA.allowance(address(this), address(blendedAmm)) / 1e18);
-        console2.log("  Blended AMM Token B allowance:", tokenB.allowance(address(this), address(blendedAmm)) / 1e18);
     }
 
     function _resetSwapState() internal {
@@ -564,27 +451,64 @@ contract Benchmark is Test {
         }
     }
 
+    // function _reportBabylonianComparison(string memory operation, BenchmarkResult memory babylonianResult, BenchmarkResult memory newtonResult) internal pure {
+    //     console2.log("\n", operation, "Babylonian vs Newton-Raphson Results:");
+    //     console2.log("  Babylonian Method (avg): %d gas", babylonianResult.blendedGas);
+    //     console2.log("  Newton-Raphson Method (avg): %d gas", newtonResult.blendedGas);
+        
+    //     int256 gasDiff = int256(newtonResult.blendedGas) - int256(babylonianResult.blendedGas);
+    //     uint256 percentChange = gasDiff > 0 ? 
+    //         (uint256(gasDiff) * 100) / babylonianResult.blendedGas : 
+    //         (uint256(-gasDiff) * 100) / babylonianResult.blendedGas;
+        
+    //     console2.log("  Gas difference: %d gas", gasDiff);
+    //     console2.log("  Percent change: %d%%", percentChange);
+        
+    //     if (newtonResult.blendedGas < babylonianResult.blendedGas) {
+    //         console2.log("  [SUCCESS] Newton-Raphson is more gas-efficient");
+    //     } else {
+    //         console2.log("  [INFO] Babylonian is more gas-efficient");
+    //     }
+    // }
+
+    // function _analyzeBabylonianResults(BenchmarkResult memory babylonianResult, BenchmarkResult memory newtonResult) internal pure {
+    //     console2.log("\nBabylonian vs Newton-Raphson Analysis:");
+    //     if (newtonResult.blendedGas < babylonianResult.blendedGas) {
+    //         console2.log("  [TARGET] Newton-Raphson method is more gas-efficient");
+    //         console2.log("  [INFO] This suggests the Newton-Raphson algorithm converges faster");
+    //         console2.log("  [INFO] Consider using Newton-Raphson for production deployments");
+    //     } else {
+    //         console2.log("  [INFO] Babylonian method is more gas-efficient");
+    //         console2.log("  [INFO] This suggests the Babylonian method is well-optimized");
+    //         console2.log("  [INFO] Consider using Babylonian method for production deployments");
+    //     }
+        
+    //     // Calculate precision difference (if any)
+    //     console2.log("  [INFO] Both methods should provide similar precision for LP token calculations");
+    //     console2.log("  [INFO] The choice between methods should be based on gas efficiency");
+    // }
+
     // ============ Comprehensive Report ============
     function testGenerateComprehensiveReport() public pure {
         console2.log("==================== COMPREHENSIVE BENCHMARK REPORT ====================");
         
         console2.log("\nThis test suite provides comprehensive benchmarking of:");
         console2.log("1. Gas efficiency comparison between BasicAMM and BlendedAMM");
-        console2.log("2. Calculation accuracy analysis");
-        console2.log("3. Mathematical engine performance evaluation");
-        console2.log("4. Statistical significance through multiple iterations");
+        console2.log("2. Statistical significance through multiple iterations");
+        console2.log("3. Babylonian vs Newton-Raphson algorithm comparison");
         
         console2.log("\nKey Metrics:");
         console2.log("- Gas usage for all AMM operations");
-        console2.log("- LP token calculation accuracy");
-        console2.log("- Impermanent loss calculation precision");
-        console2.log("- Mathematical engine function performance");
+        console2.log("- Square root algorithm efficiency comparison");
+        console2.log("- Precision differences between calculation methods");
         
         console2.log("\nRecommendations:");
         console2.log("- Run individual test functions for detailed analysis");
         console2.log("- Compare results across different network conditions");
         console2.log("- Consider gas costs vs. precision improvements");
         console2.log("- Evaluate mathematical engine benefits in production");
+        console2.log("- Choose between Babylonian and Newton-Raphson based on gas efficiency");
+        console2.log("- Test both methods to determine optimal configuration for your use case");
         
         console2.log("================================================");
     }

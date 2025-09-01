@@ -98,8 +98,6 @@ contract Bootstrap is Script {
         console.log("  Blended AMM Token A allowance:", tokenA.allowance(msg.sender, address(blendedAmm)) / 1e18);
         console.log("  Blended AMM Token B allowance:", tokenB.allowance(msg.sender, address(blendedAmm)) / 1e18);
 
-        // Check if we need to reset approvals (some tokens require this)
-        checkAndResetApprovals();
         console.log("Adding liquidity to Basic AMM...");
         uint256 basicLiquidity = basicAmm.addLiquidity(INITIAL_LIQUIDITY, INITIAL_LIQUIDITY, 0, 0, msg.sender);
         console.log("  LP tokens received:", basicLiquidity / 1e18);
@@ -130,35 +128,5 @@ contract Bootstrap is Script {
         console.log("Basic AMM Token B allowance:", tokenB.allowance(msg.sender, address(basicAmm)) / 1e18);
         console.log("Blended AMM Token A allowance:", tokenA.allowance(msg.sender, address(blendedAmm)) / 1e18);
         console.log("Blended AMM Token B allowance:", tokenB.allowance(msg.sender, address(blendedAmm)) / 1e18);
-    }
-
-    function checkAndResetApprovals() internal {
-        // Some tokens require resetting approvals to 0 before setting new ones
-        // Check if current allowances are sufficient, if not, reset and re-approve
-        uint256 basicAllowanceA = tokenA.allowance(msg.sender, address(basicAmm));
-        uint256 basicAllowanceB = tokenB.allowance(msg.sender, address(basicAmm));
-        uint256 blendedAllowanceA = tokenA.allowance(msg.sender, address(blendedAmm));
-        uint256 blendedAllowanceB = tokenB.allowance(msg.sender, address(blendedAmm));
-
-        if (
-            basicAllowanceA < INITIAL_LIQUIDITY || basicAllowanceB < INITIAL_LIQUIDITY
-                || blendedAllowanceA < INITIAL_LIQUIDITY || blendedAllowanceB < INITIAL_LIQUIDITY
-        ) {
-            console.log("  Resetting approvals and re-approving...");
-
-            // Reset to 0 first (some tokens require this)
-            tokenA.approve(address(basicAmm), 0);
-            tokenB.approve(address(basicAmm), 0);
-            tokenA.approve(address(blendedAmm), 0);
-            tokenB.approve(address(blendedAmm), 0);
-
-            // Re-approve for max
-            tokenA.approve(address(basicAmm), type(uint256).max);
-            tokenB.approve(address(basicAmm), type(uint256).max);
-            tokenA.approve(address(blendedAmm), type(uint256).max);
-            tokenB.approve(address(blendedAmm), type(uint256).max);
-
-            console.log("  Re-approved all AMMs for max tokens");
-        }
     }
 }
