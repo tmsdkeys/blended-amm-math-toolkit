@@ -1,15 +1,41 @@
-gblend verify-contract $BASIC_AMM BasicAMM \
+gblend verify-contract 0xC48B2aCb4876f55feDC2D55ECEf2b1e9c3b6a1D4 BasicAMM \
     --verifier blockscout \
     --verifier-url https://testnet.fluentscan.xyz/api/ \
     --constructor-args $(cast abi-encode "constructor(address,address,string,string)" $TOKEN_A $TOKEN_B "Basic AMM LP Token" "BAMM-LP")
 
-gblend verify-contract $ENHANCED_AMM src/EnhancedAMM.sol:EnhancedAMM \
+gblend verify-contract $ENHANCED_AMM src/BlendedAMM.sol:BlendedAMM \
     --verifier blockscout \
     --verifier-url https://testnet.fluentscan.xyz/api/ \
-    --constructor-args $(cast abi-encode "constructor(address,address,address,string,string)" $TOKEN_A $TOKEN_B $MATH_ENGINE "EnhancedAMM-LPToken" "EAMM-LP")
+    --constructor-args $(cast abi-encode "constructor(address,address,address,string,string)" $TOKEN_A $TOKEN_B $MATH_ENGINE "BlendedAMM-LPToken" "BAMM-LP")
 
+gblend script script/DeployAMMs.s.sol:DeployAMMs \
+    --rpc-url $RPC_URL \
+    --private-key $PRIVATE_KEY \
+    --broadcast
+    
 gblend script script/Bootstrap.s.sol:Bootstrap \
-    --rpc-url fluent-testnet \
+    --rpc-url $RPC_URL \
     --private-key $PRIVATE_KEY \
     --broadcast \
     -vvv
+
+gblend create MathematicalEngine.wasm \
+    --rpc-url $RPC_URL \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    --verify \
+    --wasm \
+    --verifier blockscout \
+    --verifier-url https://testnet.fluentscan.xyz/api/
+
+gblend create src/BlendedAMM.sol:BlendedAMM \
+    --rpc-url $RPC_URL \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    --constructor-args $TOKEN_A $TOKEN_B $MATH_ENGINE "BlendedAMM-LPToken" "BL-SOLTRUST-LP" 
+
+forge create src/BasicAMM.sol:BasicAMM \
+    --rpc-url https://rpc.testnet.fluent.xyz \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    --constructor-args $TOKEN_A $TOKEN_B "Basic AMM SOLTRUST LP Token" "SOLTRUST-LP"

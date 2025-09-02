@@ -7,9 +7,9 @@ A demonstration of Fluentbase's blended execution capabilities, showcasing how R
 This project implements an Automated Market Maker (AMM) with two versions:
 
 - **BasicAMM**: Pure Solidity implementation (baseline)
-- **EnhancedAMM**: Blended execution using a Rust mathematical engine
+- **BlendedAMM**: Blended execution using a Rust mathematical engine
 
-The Enhanced AMM leverages Rust for computationally expensive operations, demonstrating:
+The Blended AMM leverages Rust for computationally expensive operations, demonstrating:
 
 - **90% gas reduction** on mathematical operations like square root
 - **Advanced capabilities** impossible in Solidity (exponential/logarithmic functions)
@@ -61,11 +61,34 @@ make setup
 # Build all contracts (Rust + Solidity)
 make build
 
-# Deploy to Fluent testnet
-make deploy  # Uses RPC from foundry.toml
+# Deploy to Fluent testnet (default)
+make deploy
+
+# Deploy to Fluent devnet
+make deploy-devnet
+
+# Deploy to specific network using profile
+forge script script/Deploy.s.sol --profile testnet --broadcast
+forge script script/Deploy.s.sol --profile devnet --broadcast
 ```
 
 Note: You need to have a `$PRIVATE_KEY` environment variable set. (Use .env file for this).
+
+### Network Configuration
+
+The project uses environment variables for network configuration:
+
+- **Testnet**: Set `DEPLOYMENT_PATH=./deployments/testnet.json`
+- **Devnet**: Set `DEPLOYMENT_PATH=./deployments/devnet.json`
+
+The deployment scripts read the deployment path from the `DEPLOYMENT_PATH` environment variable.
+
+### Smart Token Deployment
+
+The deployment script intelligently handles tokens:
+- **Use existing tokens** by adding their addresses to the deployment file
+- **Deploy new mock tokens** if no addresses are provided
+- **Mix and match** existing and new tokens as needed
 
 ### Run Benchmarks
 
@@ -83,7 +106,7 @@ make snapshot
 
 TODO: Update with real reproducible numbers
 
-| Operation | Basic AMM (Solidity) | Enhanced AMM (Rust) | Savings |
+| Operation | Basic AMM (Solidity) | Blended AMM (Rust) | Savings |
 |-----------|---------------------|---------------------|---------|
 | Square Root | ~20,000 gas | ~2,000 gas | **90%** |
 | Add Liquidity (first) | ~250,000 gas | ~180,000 gas | **28%** |
@@ -134,7 +157,7 @@ pub trait MathematicalEngineAPI {
 
 ### Solidity Integration
 
-The Enhanced AMM seamlessly calls Rust functions:
+The Blended AMM seamlessly calls Rust functions:
 
 ```solidity
 // Simple interface call - no complex ABI encoding needed
@@ -155,7 +178,7 @@ uint256 fee = mathEngine.calculateDynamicFee(params);
 ```
 ├── src/
 │   ├── BasicAMM.sol              # Pure Solidity AMM (baseline)
-│   └── EnhancedAMM.sol           # Blended execution AMM
+│   └── BlendedAMM.sol           # Blended execution AMM
 ├── rust-contracts/
 │   ├── src/
 │   │   └── lib.rs                # Rust mathematical engine

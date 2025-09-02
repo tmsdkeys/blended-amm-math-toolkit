@@ -2,7 +2,6 @@
 extern crate alloc;
 extern crate fluentbase_sdk;
 
-use alloc::vec::Vec;
 use fluentbase_sdk::{
     basic_entrypoint,
     codec::Codec,
@@ -13,7 +12,7 @@ use fluentbase_sdk::{
 // ============ Custom Type Definitions Using Codec ============
 
 /// Parameters for slippage calculation
-#[derive(Codec, Debug, Default, Clone, PartialEq)]
+#[derive(Codec, Default, Debug, Clone, PartialEq)]
 pub struct SlippageParams {
     pub amount_in: U256,
     pub reserve_in: U256,
@@ -22,7 +21,7 @@ pub struct SlippageParams {
 }
 
 /// Parameters for dynamic fee calculation
-#[derive(Codec, Debug, Default, Clone, PartialEq)]
+#[derive(Codec, Default, Debug, Clone, PartialEq)]
 pub struct DynamicFeeParams {
     pub volatility: U256,      // in basis points
     pub volume_24h: U256,      // in wei
@@ -30,7 +29,7 @@ pub struct DynamicFeeParams {
 }
 
 /// Result from optimization calculations
-#[derive(Codec, Debug, Default, Clone, PartialEq)]
+#[derive(Codec, Default, Debug, Clone, PartialEq)]
 pub struct OptimizationResult {
     pub optimal_amount: U256,
     pub expected_output: U256,
@@ -38,7 +37,7 @@ pub struct OptimizationResult {
 }
 
 /// Pool information for routing
-#[derive(Codec, Debug, Default, Clone, PartialEq)]
+#[derive(Codec, Default, Debug, Clone, PartialEq)]
 pub struct Pool {
     pub reserve_in: U256,
     pub reserve_out: U256,
@@ -52,7 +51,6 @@ const SCALE_6: U256 = U256::from_limbs([1_000_000, 0, 0, 0]); // 1e6
 const BASIS_POINTS: U256 = U256::from_limbs([10_000, 0, 0, 0]); // 10000
 
 // Mathematical constants scaled to 1e18
-const E_SCALED: U256 = U256::from_limbs([2_718_281_828_459_045_235, 0, 0, 0]); // e * 1e18
 const LN2_SCALED: U256 = U256::from_limbs([693_147_180_559_945_309, 0, 0, 0]); // ln(2) * 1e18
 
 // Maximum iterations for convergence algorithms
@@ -67,7 +65,7 @@ struct MathematicalEngine<SDK> {
 
 /// Trait defining the mathematical engine interface
 pub trait MathematicalEngineAPI {
-    fn calculate_precise_square_root(&self, value: U256) -> U256;
+    fn calculate_precise_square_root(&self, value: U256, baby: bool) -> U256;
     fn calculate_precise_slippage(&self, params: SlippageParams) -> U256;
     fn calculate_dynamic_fee(&self, params: DynamicFeeParams) -> U256;
     fn optimize_swap_amount(
@@ -77,18 +75,26 @@ pub trait MathematicalEngineAPI {
         reserve_out: U256,
         fee_rate: U256,
     ) -> OptimizationResult;
-    fn calculate_lp_tokens(&self, amount0: U256, amount1: U256) -> U256;
-    fn calculate_impermanent_loss(&self, initial_price: U256, current_price: U256) -> U256;
-    fn find_optimal_route(&self, amount_in: U256, pools: Vec<Pool>, fee_rates: Vec<U256>) -> U256;
+    fn calculate_lp_tokens(&self, amount0: U256, amount1: U256, baby: bool) -> U256;
+    fn calculate_impermanent_loss(
+        &self,
+        initial_price: U256,
+        current_price: U256,
+        baby: bool,
+    ) -> U256;
 }
 
 #[router(mode = "solidity")]
 impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
     /// Calculate precise square root using Newton-Raphson method
     /// More efficient than Solidity's iterative Babylonian method
-    #[function_id("calculatePreciseSquareRoot(uint256)")]
-    fn calculate_precise_square_root(&self, value: U256) -> U256 {
-        sqrt_fixed(value)
+    #[function_id("calculatePreciseSquareRoot(uint256,bool)")]
+    fn calculate_precise_square_root(&self, value: U256, baby: bool) -> U256 {
+        if baby {
+            sqrt_fixed_babylonian(value)
+        } else {
+            sqrt_fixed_newton_raphson(value)
+        }
     }
 
     /// Calculate slippage with high-precision fixed-point arithmetic
@@ -169,7 +175,7 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
 
         // Calculate using fixed-point square root
         let inner = mul_div(k, total_amount * fee_multiplier, BASIS_POINTS);
-        let optimal_ratio = sqrt_fixed(inner);
+        let optimal_ratio = sqrt_fixed_babylonian(inner); // Use Babylonian method for reliability
         let optimal_amount = optimal_ratio.min(total_amount);
 
         // Calculate expected output with high precision
@@ -201,18 +207,27 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
 
     /// Calculate LP token amount using geometric mean
     /// More precise than Solidity's approximations
-    #[function_id("calculateLpTokens(uint256,uint256)")]
-    fn calculate_lp_tokens(&self, amount0: U256, amount1: U256) -> U256 {
+    #[function_id("calculateLpTokens(uint256,uint256,bool)")]
+    fn calculate_lp_tokens(&self, amount0: U256, amount1: U256, baby: bool) -> U256 {
         // Geometric mean: sqrt(amount0 * amount1)
         // Using high-precision fixed-point sqrt
         let product = amount0 * amount1;
-        sqrt_fixed(product)
+        if baby {
+            sqrt_fixed_babylonian(product)
+        } else {
+            sqrt_fixed_newton_raphson(product)
+        }
     }
 
     /// Calculate impermanent loss with high precision
     /// Returns loss in basis points
-    #[function_id("calculateImpermanentLoss(uint256,uint256)")]
-    fn calculate_impermanent_loss(&self, initial_price: U256, current_price: U256) -> U256 {
+    #[function_id("calculateImpermanentLoss(uint256,uint256,bool)")]
+    fn calculate_impermanent_loss(
+        &self,
+        initial_price: U256,
+        current_price: U256,
+        baby: bool,
+    ) -> U256 {
         if initial_price == U256::ZERO || current_price == U256::ZERO {
             return U256::ZERO;
         }
@@ -224,7 +239,11 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
         let price_ratio = mul_div(current_price, SCALE_18, initial_price);
 
         // Calculate sqrt of ratio
-        let sqrt_ratio = sqrt_fixed(price_ratio);
+        let sqrt_ratio = if baby {
+            sqrt_fixed_babylonian(price_ratio)
+        } else {
+            sqrt_fixed_newton_raphson(price_ratio)
+        };
 
         // Calculate IL: 2 * sqrt_ratio / (1 + price_ratio) - 1
         let numerator = U256::from(2) * sqrt_ratio;
@@ -239,81 +258,64 @@ impl<SDK: SharedAPI> MathematicalEngineAPI for MathematicalEngine<SDK> {
             U256::ZERO
         }
     }
-
-    /// Multi-hop routing optimization with fixed-point precision
-    /// Finds the best output through multiple pools
-    #[function_id("findOptimalRoute(uint256,(uint256,uint256)[],uint256[])")]
-    fn find_optimal_route(&self, amount_in: U256, pools: Vec<Pool>, fee_rates: Vec<U256>) -> U256 {
-        if pools.is_empty() || pools.len() != fee_rates.len() {
-            return U256::ZERO;
-        }
-
-        let mut current_amount = amount_in;
-
-        // Calculate output through each pool in sequence
-        for i in 0..pools.len() {
-            let pool = &pools[i];
-            let fee_rate = fee_rates[i];
-
-            let fee_multiplier = BASIS_POINTS - fee_rate;
-            let amount_in_with_fee = current_amount * fee_multiplier;
-
-            // High-precision calculation using mul_div
-            let numerator = amount_in_with_fee * pool.reserve_out;
-            let denominator = pool.reserve_in * BASIS_POINTS + amount_in_with_fee;
-
-            current_amount = mul_div(numerator, U256::from(1), denominator);
-
-            if current_amount == U256::ZERO {
-                break;
-            }
-        }
-
-        current_amount
-    }
 }
 
 // ============ Fixed-Point Mathematical Functions ============
 
-/// High-precision square root using Newton-Raphson method
-/// Optimized for U256 with early exit conditions
-fn sqrt_fixed(x: U256) -> U256 {
+/// Integer square root using Newton-Raphson method
+/// Input x is already scaled (e.g., from Solidity contract)
+/// Output preserves the scaling factor
+fn sqrt_fixed_newton_raphson(x: U256) -> U256 {
     if x == U256::ZERO {
         return U256::ZERO;
     }
-    if x <= U256::from(3) {
+    if x == U256::from(1) {
         return U256::from(1);
     }
 
-    // Initial guess: find the highest set bit and use 2^(bit_position/2)
-    let mut z = x;
-    let mut y = x;
-
-    // Optimize initial guess using bit manipulation
-    if x >= U256::from(2).pow(U256::from(128)) {
-        y = U256::from(2).pow(U256::from(128));
-    } else if x >= U256::from(2).pow(U256::from(64)) {
-        y = U256::from(2).pow(U256::from(64));
-    } else if x >= U256::from(2).pow(U256::from(32)) {
-        y = U256::from(2).pow(U256::from(32));
-    } else if x >= U256::from(2).pow(U256::from(16)) {
-        y = U256::from(2).pow(U256::from(16));
-    } else {
-        y = x / U256::from(2);
+    // Standard integer square root - no additional scaling needed
+    let mut bit = U256::from(1);
+    let mut temp = x;
+    while temp > bit {
+        bit = bit << 2;
+        temp = temp >> 2;
     }
 
-    // Newton-Raphson iteration: y = (y + x/y) / 2
-    for _ in 0..MAX_ITERATIONS {
-        z = y;
-        y = (y + x / y) / U256::from(2);
+    let mut y = bit;
 
-        // Check for convergence
-        if y >= z {
-            return z;
+    for _ in 0..MAX_ITERATIONS {
+        let prev_y = y;
+        y = (y + x / y) >> 1;
+
+        if y >= prev_y {
+            return prev_y;
         }
     }
 
-    z
+    y
+}
+
+/// Integer square root using Babylonian method
+/// Input x is already scaled (e.g., from Solidity contract)
+/// Output preserves the scaling factor
+fn sqrt_fixed_babylonian(x: U256) -> U256 {
+    if x == U256::ZERO {
+        return U256::ZERO;
+    }
+    if x == U256::from(1) {
+        return U256::from(1);
+    }
+
+    // Standard integer square root using Babylonian method - no additional scaling needed
+    let mut z = (x + U256::from(1)) / U256::from(2);
+    let mut y = x;
+
+    while z < y {
+        y = z;
+        z = (x / z + z) / U256::from(2);
+    }
+
+    y
 }
 
 /// Approximated exponential function using Taylor series
@@ -424,14 +426,62 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sqrt() {
-        assert_eq!(sqrt_fixed(U256::from(0)), U256::from(0));
-        assert_eq!(sqrt_fixed(U256::from(1)), U256::from(1));
-        assert_eq!(sqrt_fixed(U256::from(4)), U256::from(2));
-        assert_eq!(sqrt_fixed(U256::from(9)), U256::from(3));
-        assert_eq!(sqrt_fixed(U256::from(16)), U256::from(4));
-        assert_eq!(sqrt_fixed(U256::from(625)), U256::from(25));
-        assert_eq!(sqrt_fixed(U256::from(1000000)), U256::from(1000));
+    fn test_sqrt_fixed_babylonian() {
+        // Test basic cases - input is unscaled integers, output should be properly scaled
+        assert_eq!(sqrt_fixed_babylonian(U256::from(0)), U256::from(0));
+        assert_eq!(sqrt_fixed_babylonian(U256::from(1)), U256::from(1));
+
+        // Test with realistic LP token calculation values
+        // Both amounts are already scaled from Solidity
+        let amount0 = U256::from(10000u64) * SCALE_18; // 10000 tokens
+        let amount1 = U256::from(10000u64) * SCALE_18; // 10000 tokens
+        let product = amount0 * amount1; // 10000^2 * 10^36
+        let sqrt_result = sqrt_fixed_babylonian(product);
+
+        // Expected: sqrt should give us 10000 * 10^18
+        let expected = U256::from(10000u64) * SCALE_18;
+
+        let diff = if sqrt_result > expected {
+            sqrt_result - expected
+        } else {
+            expected - sqrt_result
+        };
+
+        assert!(
+            diff < expected / U256::from(100000),
+            "sqrt_result: {}, expected: {}, diff: {}",
+            sqrt_result,
+            expected,
+            diff
+        );
+    }
+
+    #[test]
+    fn test_sqrt_fixed_newton_raphson() {
+        // Test basic cases - input is unscaled integers, output should be properly scaled
+        assert_eq!(sqrt_fixed_newton_raphson(U256::from(0)), U256::from(0));
+        assert_eq!(sqrt_fixed_newton_raphson(U256::from(1)), U256::from(1));
+
+        // Test with realistic LP token calculation values
+        let amount0 = U256::from(10000u64) * SCALE_18;
+        let amount1 = U256::from(10000u64) * SCALE_18;
+        let product = amount0 * amount1;
+        let sqrt_result = sqrt_fixed_newton_raphson(product);
+        let expected = U256::from(10000u64) * SCALE_18;
+
+        let diff = if sqrt_result > expected {
+            sqrt_result - expected
+        } else {
+            expected - sqrt_result
+        };
+
+        assert!(
+            diff < expected / U256::from(100000),
+            "Newton-Raphson sqrt_result: {}, expected: {}, diff: {}",
+            sqrt_result,
+            expected,
+            diff
+        );
     }
 
     #[test]

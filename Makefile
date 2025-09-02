@@ -57,7 +57,7 @@ deploy-amm: build ## Deploy AMM contracts standalone
 	@echo "$(GREEN)✓ Basic AMM deployed$(NC)"
 	
 	@echo "$(BLUE)Deploying Enhanced AMM...$(NC)"
-	gblend create src/EnhancedAMM.sol:EnhancedAMM \
+	gblend create src/BlendedAMM.sol:BlendedAMM \
 		--rpc-url fluent-testnet \
 		--private-key $PRIVATE_KEY \
 		--broadcast \
@@ -70,14 +70,44 @@ deploy-amm: build ## Deploy AMM contracts standalone
 	@echo "$(GREEN)✓ Enhanced AMM deployed$(NC)"
 
 .PHONY: deploy
-deploy: build ## Deploy all contracts using the deployment script
-	@echo "$(BLUE)Deploying all contracts via script...$(NC)"
+deploy: build ## Deploy all contracts to testnet (default)
+	@echo "$(BLUE)Deploying all contracts to testnet...$(NC)"
 	gblend script script/Deploy.s.sol:Deploy \
-		--rpc-url fluent-testnet \
+		--profile testnet \
 		--private-key $PRIVATE_KEY \
 		--broadcast \
 		-vvv
-	@echo "$(GREEN)✓ All contracts deployed$(NC)"
+	@echo "$(GREEN)✓ All contracts deployed to testnet$(NC)"
+
+.PHONY: deploy-devnet
+deploy-devnet: build ## Deploy all contracts to devnet
+	@echo "$(BLUE)Deploying all contracts to devnet...$(NC)"
+	gblend script script/Deploy.s.sol:Deploy \
+		--profile devnet \
+		--private-key $PRIVATE_KEY \
+		--broadcast \
+		-vvv
+	@echo "$(GREEN)✓ All contracts deployed to devnet$(NC)"
+
+.PHONY: bootstrap
+bootstrap: ## Bootstrap deployed contracts with liquidity
+	@echo "$(BLUE)Bootstrapping contracts with liquidity...$(NC)"
+	gblend script script/Bootstrap.s.sol:Bootstrap \
+		--profile testnet \
+		--private-key $PRIVATE_KEY \
+		--broadcast \
+		-vvv
+	@echo "$(GREEN)✓ Contracts bootstrapped$(NC)"
+
+.PHONY: bootstrap-devnet
+bootstrap-devnet: ## Bootstrap deployed contracts on devnet
+	@echo "$(BLUE)Bootstrapping contracts on devnet...$(NC)"
+	gblend script script/Bootstrap.s.sol:Bootstrap \
+		--profile devnet \
+		--private-key $PRIVATE_KEY \
+		--broadcast \
+		-vvv
+	@echo "$(GREEN)✓ Contracts bootstrapped on devnet$(NC)"
 
 .PHONY: test
 test: ## Run all tests
