@@ -166,7 +166,7 @@ contract GasBenchmark is Test {
         console2.log("\n=== ADD LIQUIDITY BENCHMARK ===");
         
         // Transfer tokens needed for this specific test
-        _transferTokensForTest(LIQUIDITY_AMOUNT * (ITERATIONS + 1) * 3, LIQUIDITY_AMOUNT * (ITERATIONS + 1) * 3);
+        _transferTokensForTest(LIQUIDITY_AMOUNT * (ITERATIONS) * 4, LIQUIDITY_AMOUNT * (ITERATIONS) * 4);
         
         (BenchmarkResult memory resultBabylon, BenchmarkResult memory resultNewton) = _benchmarkAddLiquidityOperations();
         
@@ -188,25 +188,14 @@ contract GasBenchmark is Test {
         uint256 totalBlendedGasBabylon;
         uint256 totalBlendedGasNewton;
 
-        // Reset state
-        _resetLiquidityState();
-
-        console2.log("Running warm-up calls...");
-        _addLiquidityToAMM(basicAmm);
-        _addLiquidityToAMM(blendedAmm);
-        _setUseBabylonian(false);
-
-        _resetLiquidityState();
-
-        _addLiquidityToAMM(basicAmm);
-        _addLiquidityToAMM(blendedAmm);
-        _setUseBabylonian(true);
-
         console2.log("Running", ITERATIONS, "add liquidity iterations for averaging...");
         
         for (uint256 i = 0; i < ITERATIONS; i++) {
             // Reset state between iterations
             _resetLiquidityState();
+
+            _addLiquidityToAMM(basicAmm);
+            _addLiquidityToAMM(blendedAmm);
             
             // Test Basic AMM add liquidity
             uint256 gasStart = gasleft();
@@ -219,6 +208,9 @@ contract GasBenchmark is Test {
             _addLiquidityToAMM(blendedAmm);
             uint256 blendedGasBabylon = gasStart - gasleft();
             totalBlendedGasBabylon += blendedGasBabylon;
+
+            // Keep liquidity balanced
+            _addLiquidityToAMM(basicAmm);
 
             // Test Blended AMM add liquidity
             _setUseBabylonian(false);
@@ -300,7 +292,6 @@ contract GasBenchmark is Test {
     function _setUseBabylonian(bool useBabylonian) internal {
         vm.prank(deployer);
         blendedAmm.setUseBabylonian(useBabylonian);
-        console2.log("  Set useBabylonian to:", useBabylonian);
     }
     
     /// @dev Set up token approvals for the test contract in setUp()
@@ -450,43 +441,6 @@ contract GasBenchmark is Test {
             console2.log("  [INFO] Consider if the precision improvements justify the gas cost");
         }
     }
-
-    // function _reportBabylonianComparison(string memory operation, BenchmarkResult memory babylonianResult, BenchmarkResult memory newtonResult) internal pure {
-    //     console2.log("\n", operation, "Babylonian vs Newton-Raphson Results:");
-    //     console2.log("  Babylonian Method (avg): %d gas", babylonianResult.blendedGas);
-    //     console2.log("  Newton-Raphson Method (avg): %d gas", newtonResult.blendedGas);
-        
-    //     int256 gasDiff = int256(newtonResult.blendedGas) - int256(babylonianResult.blendedGas);
-    //     uint256 percentChange = gasDiff > 0 ? 
-    //         (uint256(gasDiff) * 100) / babylonianResult.blendedGas : 
-    //         (uint256(-gasDiff) * 100) / babylonianResult.blendedGas;
-        
-    //     console2.log("  Gas difference: %d gas", gasDiff);
-    //     console2.log("  Percent change: %d%%", percentChange);
-        
-    //     if (newtonResult.blendedGas < babylonianResult.blendedGas) {
-    //         console2.log("  [SUCCESS] Newton-Raphson is more gas-efficient");
-    //     } else {
-    //         console2.log("  [INFO] Babylonian is more gas-efficient");
-    //     }
-    // }
-
-    // function _analyzeBabylonianResults(BenchmarkResult memory babylonianResult, BenchmarkResult memory newtonResult) internal pure {
-    //     console2.log("\nBabylonian vs Newton-Raphson Analysis:");
-    //     if (newtonResult.blendedGas < babylonianResult.blendedGas) {
-    //         console2.log("  [TARGET] Newton-Raphson method is more gas-efficient");
-    //         console2.log("  [INFO] This suggests the Newton-Raphson algorithm converges faster");
-    //         console2.log("  [INFO] Consider using Newton-Raphson for production deployments");
-    //     } else {
-    //         console2.log("  [INFO] Babylonian method is more gas-efficient");
-    //         console2.log("  [INFO] This suggests the Babylonian method is well-optimized");
-    //         console2.log("  [INFO] Consider using Babylonian method for production deployments");
-    //     }
-        
-    //     // Calculate precision difference (if any)
-    //     console2.log("  [INFO] Both methods should provide similar precision for LP token calculations");
-    //     console2.log("  [INFO] The choice between methods should be based on gas efficiency");
-    // }
 
     // ============ Comprehensive Report ============
     function testGenerateComprehensiveReport() public pure {
