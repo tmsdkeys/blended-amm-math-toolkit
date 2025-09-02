@@ -20,3 +20,5 @@ temp/
 
 test/lp-token-dataset.json
 test/lp-token-dataset-stats.json
+
+.vscode/

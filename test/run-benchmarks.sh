@@ -31,10 +31,6 @@ echo "3️⃣  Testing Remove Liquidity Operations..."
 gblend test --match-test testRemoveLiquidityBenchmark -vvv --rpc-url $RPC_URL
 
 echo ""
-echo "4️⃣  Testing Calculation Accuracy..."
-gblend test --match-test testCalculationAccuracy -vvv --rpc-url $RPC_URL
-
-echo ""
 echo "5️⃣  Generating Comprehensive Report..."
 gblend test --match-test testGenerateComprehensiveReport -vvv --rpc-url $RPC_URL
 

@@ -4,51 +4,46 @@ This directory contains comprehensive benchmarking tests that compare the perfor
 
 ## Overview
 
-The `ComprehensiveBenchmark.t.sol` test suite provides:
+The `GasBenchmark.t.sol` test suite provides:
 
 1. **Gas Efficiency Comparison** - Measures gas usage for all AMM operations
-2. **Calculation Accuracy Analysis** - Compares LP token and impermanent loss calculations
-3. **Mathematical Engine Performance** - Evaluates Rust WASM engine benefits
-4. **Statistical Significance** - Multiple iterations for reliable averages
-5. **Real Contract Testing** - Uses deployed contracts, not mocks
+2. **Statistical Significance** - Multiple iterations for reliable averages
+3. **Real Contract Testing** - Uses deployed contracts, not mocks
 
 ## Prerequisites
 
 Before running benchmarks, ensure:
 
 1. **Contracts are deployed** to your target network
-2. **Bootstrap script has been run** to provide liquidity and test accounts
+2. **Bootstrap script has been run** to provide liquidity
 3. **Deployment JSON file** exists (e.g., `./deployments/testnet.json`)
 
-## Quick Start
+## Quickstart
 
-### Run All Benchmarks
-
+Make sure to source your env variables (you'll need `$RPC_URL` and `$PRIVATE_KEY`):
 ```bash
-# Using default testnet deployment
-./test/run-benchmarks.sh
+source .env
+```
 
-# Or specify custom deployment path
-DEPLOYMENT_PATH="./deployments/devnet.json" ./test/run-benchmarks.sh
+Run all tests at once:
+```bash
+gblend test -vvv --rpc-url $RPC_URL
 ```
 
 ### Run Individual Tests
 
 ```bash
 # Swap operations benchmark
-forge test --match-test testSwapBenchmark -vv
+gblend test --match-test testSwapBenchmark -vv
 
 # Add liquidity benchmark
-forge test --match-test testAddLiquidityBenchmark -vv
+gblend test --match-test testAddLiquidityBenchmark -vv
 
 # Remove liquidity benchmark
-forge test --match-test testRemoveLiquidityBenchmark -vv
-
-# Calculation accuracy test
-forge test --match-test testCalculationAccuracy -vv
+gblend test --match-test testRemoveLiquidityBenchmark -vv
 
 # Generate comprehensive report
-forge test --match-test testGenerateComprehensiveReport -vv
+gblend test --match-test testGenerateComprehensiveReport -vv
 ```
 
 ## Test Structure
@@ -64,18 +59,13 @@ forge test --match-test testGenerateComprehensiveReport -vv
 - Tests optimal amount calculations
 - Compares LP token minting efficiency
 - Resets state between iterations
+- Compares different square root implementations in Rust.
 
 ### 3. Remove Liquidity Benchmark (`testRemoveLiquidityBenchmark`)
 - Benchmarks liquidity removal operations
 - Tests 25% LP token removal
 - Compares gas efficiency of withdrawal logic
 - Maintains consistent test conditions
-
-### 4. Calculation Accuracy Test (`testCalculationAccuracy`)
-- **LP Token Accuracy**: Compares actual vs expected LP tokens
-- **Impermanent Loss**: Tests precision of IL calculations
-- **Mathematical Engine**: Direct function performance testing
-- **Solidity vs Rust**: Accuracy comparison
 
 ### 5. Comprehensive Report (`testGenerateComprehensiveReport`)
 - Overview of all benchmark capabilities
@@ -91,13 +81,13 @@ forge test --match-test testGenerateComprehensiveReport -vv
 export DEPLOYMENT_PATH="./deployments/devnet.json"
 
 # Run tests with custom deployment
-forge test --match-test testSwapBenchmark -vv
+gblend test --match-test testSwapBenchmark -vv
 ```
 
 ### Test Constants
 
 ```solidity
-uint256 constant ITERATIONS = 5;                    // Test iterations
+uint256 constant ITERATIONS = 4;                    // Test iterations
 uint256 constant SWAP_AMOUNT = 100 * 1e18;         // Base swap amount
 uint256 constant LIQUIDITY_AMOUNT = 1000 * 1e18;   // Base liquidity amount
 uint256 constant REMOVE_PERCENTAGE = 25;            // LP removal percentage
@@ -115,35 +105,6 @@ Swap Operations Results:
   Percent change: 5.6%
   [SUCCESS] Blended AMM uses LESS gas
 ```
-
-### Accuracy Analysis
-
-```
-Testing LP Token Calculation Accuracy...
-  Expected LP tokens: 1000.0
-  Basic AMM LP tokens: 999.8
-  Blended AMM LP tokens: 1000.0
-  Basic AMM difference: 0.2
-  Blended AMM difference: 0.0
-  [SUCCESS] Blended AMM is more accurate!
-```
-
-## Key Metrics
-
-### Gas Efficiency
-- **Swap Operations**: Token exchange gas usage
-- **Liquidity Operations**: Add/remove liquidity gas costs
-- **Mathematical Functions**: Direct engine performance
-
-### Accuracy Improvements
-- **LP Token Calculations**: Precision of liquidity token minting
-- **Impermanent Loss**: Accuracy of IL calculations
-- **Price Impact**: Slippage calculation precision
-
-### Performance Analysis
-- **Gas Savings**: Percentage reduction in gas usage
-- **Accuracy Gains**: Improvement in calculation precision
-- **Trade-offs**: Gas cost vs. precision benefits
 
 ## Best Practices
 
@@ -188,10 +149,10 @@ Testing LP Token Calculation Accuracy...
 
 ```bash
 # Run with maximum verbosity
-forge test --match-test testSwapBenchmark -vvvv
+gblend test --match-test testSwapBenchmark -vvvv
 
 # Run specific test with detailed logging
-forge test --match-test testCalculationAccuracy -vv
+gblend test --match-test testCalculationAccuracy -vv
 ```
 
 ## Advanced Usage
@@ -207,16 +168,6 @@ uint256 constant SMALL_LIQUIDITY = 100 * 1e18;
 function testCustomScenario() public {
     // Your custom benchmark logic
 }
-```
-
-### Integration with CI/CD
-
-```yaml
-# Example GitHub Actions workflow
-- name: Run AMM Benchmarks
-  run: |
-    export DEPLOYMENT_PATH="./deployments/mainnet.json"
-    ./test/run-benchmarks.sh
 ```
 
 ## Contributing
